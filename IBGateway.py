@@ -1,0 +1,421 @@
+import argparse
+import sys
+from time import sleep
+from datetime import datetime
+import pytz
+import time
+import logging
+from threading import Thread
+from typing import Optional, Dict, Any, List
+
+import ibapi
+from ibapi import wrapper
+from ibapi.client import EClient
+from ibapi.wrapper import *
+from ibapi.ticktype import *
+from ibapi.common import *
+from ibapi.utils import *
+
+from ibapi.account_summary_tags import *
+from Contracts import Contracts
+from Orders import Orders
+
+print(ibapi.__version__)
+
+MARKET_DATA_TYPE = {
+    "LIVE": 1,
+    "FROZEN": 2,
+    "DELAYED": 3,
+    "DELAYED_FROZEN":4
+}
+
+class TestWrapper(wrapper.EWrapper):
+  def __init__(self):
+    wrapper.EWrapper.__init__(self)
+    
+class TestClient(EClient):
+  def __init__(self, wrapper):
+    EClient.__init__(self, wrapper)
+
+class IBGateway(TestWrapper, TestClient):
+
+    def __init__(self):
+
+        TestWrapper.__init__(self)
+        TestClient.__init__(self, wrapper=self)
+
+        self.host: str = ""
+        self.port: int = None
+        self.clientid: int = 0
+        self.accountid: str = ""  
+        
+        self.connected: bool = False
+        self.account_summary: Dict = {}
+        self.requests : Dict = {
+                                "market_data": {},
+                                "account_info": set(),
+                                "position": set(),
+                                "open_orders": set(),
+                                "account_updates" : {}
+                              } 
+        self.ticks: Dict = {}
+        self.my_position: Dict = {}
+        self.orderid: int = 0
+        self.orders: Dict = {}
+  
+      
+    ####Connection########
+    def connect_and_run(
+        self, 
+        host: str, 
+        port: int, 
+        clientid: int,
+        accountid: str
+    ):
+
+        self.host = host
+        self.port = port
+        self.clientid = clientid
+        self.accountid = accountid
+
+        self.connect(self.host, self.port, self.clientid)
+        self.thread = Thread(target=self.run)
+        self.thread.start()
+
+    def disconnect(self):
+        return super().disconnect()
+      
+    def check_connection(self):
+        if self.isConnected():
+            return
+        
+        self.connect_and_run(self.host,self.port,self.clientid)
+    ####Connection########
+
+    ####Receving########
+    def nextValidId(self, orderId: int):
+        super().nextValidId(orderId)
+
+        logging.debug("setting nextValidOrderId: %d", orderId)
+
+        if not self.orderid:
+          self.orderid = orderId
+
+        print("NextValidId:", orderId)
+
+    def error(
+        self, 
+        reqId: TickerId, 
+        errorCode: int, 
+        errorString: str, 
+        advancedOrderRejectJson = ""
+    ):
+        super().error(reqId, errorCode, errorString, advancedOrderRejectJson)
+
+        if advancedOrderRejectJson:
+            print("Error. Id:", reqId, "Code:", errorCode, "Msg:", errorString, "AdvancedOrderRejectJson:", advancedOrderRejectJson)
+        else:
+            print("Error. Id:", reqId, "Code:", errorCode, "Msg:", errorString)
+
+    def tickPrice(
+        self, 
+        request_id: TickerId, 
+        tickType: TickType, 
+        price: float,
+        attrib: TickAttrib
+    ): 
+        super().tickPrice(request_id, tickType, price, attrib)
+        # print(datetime.now(pytz.timezone('US/Eastern')),"TickPrice. TickerId:", request_id, "tickType:", tickType,
+        #         "Price:", floatMaxString(price), "CanAutoExecute:", attrib.canAutoExecute,
+        #         "PastLimit:", attrib.pastLimit, end=' ')
+
+        if tickType == 1 or 66:
+          symbol = self.requests["market_data"][request_id]
+          self.ticks[symbol]["bid"] = price
+        
+        if tickType == 2 or 67:
+          symbol = self.requests["market_data"][request_id]
+          self.ticks[symbol]["ask"] = price
+
+        if tickType == 4 or 68:
+          symbol = self.requests["market_data"][request_id]
+          self.ticks[symbol]["last_price"] = price
+
+            # print(datetime.now(pytz.timezone('US/Eastern')), symbol, self.ticks[symbol])
+          # if tickType == TickTypeEnum.BID or tickType == TickTypeEnum.ASK:
+          #     print("PreOpen:", attrib.preOpen)
+        
+    def contractDetails(self, reqId, contractDetails):
+        print(f"contract details: {contractDetails}")
+
+    def contractDetailsEnd(self, reqId):
+        print("End of contractDetails")
+        self.disconnect()
+
+    def accountSummary(
+        self, 
+        reqId: int, 
+        account: str, 
+        tag: str, 
+        value: str,
+        currency: str
+    ):
+        super().accountSummary(reqId, account, tag, value, currency)
+
+        self.account_summary[tag] = (value,currency)
+        # print(datetime.now(pytz.timezone('US/Eastern')),self.account_summary)
+        # print("AccountSummary. ReqId:", reqId, "Account:", account,
+        #       "Tag: ", tag, "Value:", value, "Currency:", currency)
+
+    def accountSummaryEnd(self, reqId: int):  
+        super().accountSummaryEnd(reqId)
+
+        print("AccountSummaryEnd. ReqId:", reqId)
+
+    def position(
+        self, 
+        account: str, 
+        contract: Contract, 
+        position: Decimal,
+        avgCost: float
+    ):     
+        super().position(account, contract, position, avgCost)
+
+        if position != 0:
+            self.my_position[contract.symbol] = {
+                                                "position":position,
+                                                "avg_cost":floatMaxString(avgCost)
+                                                }
+        
+        # print("Position.", "Account:", account, "Symbol:", contract.symbol, "SecType:",
+        #       contract.secType, "Currency:", contract.currency,
+        #       "Position:", decimalMaxString(position), "Avg cost:", floatMaxString(avgCost))
+        
+    def positionEnd(self):
+        super().positionEnd()
+        print("PositionEnd")
+      
+    def openOrder(
+        self, 
+        orderId: OrderId, 
+        contract: Contract, 
+        order: Order,
+        orderState: OrderState
+    ):      
+        super().openOrder(
+            orderId, contract, order, orderState
+        )
+
+        orderid: str = str(orderId)
+        # print("OpenOrder. PermId:", intMaxString(order.permId), "ClientId:", intMaxString(order.clientId), " OrderId:", intMaxString(orderId), 
+        #       "Account:", order.account, "Symbol:", contract.symbol, "SecType:", contract.secType,
+        #       "Exchange:", contract.exchange, "Action:", order.action, "OrderType:", order.orderType,
+        #       "TotalQty:", decimalMaxString(order.totalQuantity), "CashQty:", floatMaxString(order.cashQty), 
+        #       "LmtPrice:", floatMaxString(order.lmtPrice), "AuxPrice:", floatMaxString(order.auxPrice), "Status:", orderState.status,
+        #       "MinTradeQty:", intMaxString(order.minTradeQty), "MinCompeteSize:", intMaxString(order.minCompeteSize),
+        #     "competeAgainstBestOffset:", floatMaxString(order.midOffsetAtWhole),"MidOffsetAtHalf:" ,floatMaxString(order.midOffsetAtHalf))
+
+        self.orders[orderid] = {
+                                "symbol": contract.symbol,
+                                "sec_type": contract.secType,
+                                "action": order.action,
+                                "order_type": order.orderType,
+                                "quantity": order.totalQuantity,
+                                "limit_price": order.lmtPrice,
+                                "status": orderState.status,
+                                }
+
+        print(self.orders)
+
+    def orderStatus(
+        self, 
+        orderId: OrderId, 
+        status: str, 
+        filled: Decimal,
+        remaining: Decimal, 
+        avgFillPrice: float, 
+        permId: int,
+        parentId: int, 
+        lastFillPrice: float, 
+        clientId: int,
+        whyHeld: str, 
+        mktCapPrice: float
+    ):             
+        super().orderStatus(
+            orderId, 
+            status, 
+            filled, 
+            remaining,
+            avgFillPrice, 
+            permId, 
+            parentId, 
+            lastFillPrice, 
+            clientId, 
+            whyHeld, 
+            mktCapPrice
+        )
+
+        orderid: str = str(orderId)      
+        # print("OrderStatus. Id:", orderId, "Status:", status, "Filled:", decimalMaxString(filled),
+        #       "Remaining:", decimalMaxString(remaining), "AvgFillPrice:", floatMaxString(avgFillPrice),
+        #       "PermId:", intMaxString(permId), "ParentId:", intMaxString(parentId), "LastFillPrice:",
+        #     floatMaxString(lastFillPrice), "ClientId:", intMaxString(clientId), "WhyHeld:",
+        #     whyHeld, "MktCapPrice:", floatMaxString(mktCapPrice))
+
+        self.orders[orderid].update({
+                                    "filled": filled,
+                                    "remaining": remaining
+                                    })
+        
+        if self.orders[orderid]['status'] == "Filled":
+           self.orders.pop(orderid)
+
+    # def updateAccountValue(self, 
+    #     key: str, 
+    #     val: str, 
+    #     currency: str,
+    #     accountName: str
+    # ):
+    #     super().updateAccountValue(key, val, currency, accountName)
+
+    #     print("UpdateAccountValue. Key:", key, "Value:", val,
+    #                 "Currency:", currency, "AccountName:", accountName)
+        
+    def updatePortfolio(self, 
+                        contract: Contract, 
+                        position: Decimal,
+                        marketPrice: float, 
+                        marketValue: float,
+                        averageCost: float, 
+                        unrealizedPNL: float,
+                        realizedPNL: float, 
+                        accountName: str
+    ):
+        super().updatePortfolio(contract, position, marketPrice, marketValue,
+                            averageCost, unrealizedPNL, realizedPNL, accountName)
+        
+        print("UpdatePortfolio.", "Symbol:", contract.symbol, "SecType:", contract.secType, "Exchange:",
+            contract.exchange, "Position:", decimalMaxString(position), "MarketPrice:", floatMaxString(marketPrice),
+            "MarketValue:", floatMaxString(marketValue), "AverageCost:", floatMaxString(averageCost),
+            "UnrealizedPNL:", floatMaxString(unrealizedPNL), "RealizedPNL:", floatMaxString(realizedPNL),
+            "AccountName:", accountName)
+
+    ########Receving########
+
+    #######Request#########
+
+    def request_market_data_type(self,type):
+       self.reqMarketDataType(MARKET_DATA_TYPE[type])
+
+    def request_market_data(self,sec_type,symbol):
+        if not self.requests["market_data"]:
+            request_id = 1000
+        else:
+            request_id = max(k for k, v in self.requests["market_data"].items()) + 1
+        self.ticks[symbol] = dict()
+        if sec_type == "STK":
+            self.reqMktData(request_id, Contracts.USStockAtSmart(symbol), "", False, False, [])
+        elif sec_type == "CASH":
+            self.reqMktData(request_id, Contracts.Fx(symbol,"USD"), "", False, False, [])
+        
+        self.requests["market_data"][request_id] = symbol
+
+    def request_account_info(self):
+        if not self.requests["account_info"]:
+            request_id = 2000
+        else:
+            request_id = max(self.requests["account_info"]) + 1
+          
+        self.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
+        self.requests["account_info"].add(request_id)
+
+    def request_position(self):
+        if not self.requests["position"]:
+            request_id = 3000
+        else:
+            request_id = max(self.requests["position"]) + 1
+          
+        self.reqPositions()
+        self.requests["position"].add(request_id)
+
+    def request_open_orders(self):
+        if not self.requests["open_orders"]:
+            request_id = 4000
+        else:
+            request_id = max(self.requests["open_orders"]) + 1
+
+        self.reqOpenOrders()
+        self.requests["open_orders"].add(request_id)
+
+    def request_account_updates(self):
+        if not self.requests["account_updates"]:
+            request_id = 5000
+        else:
+            request_id = max(self.requests["account_updates"]) + 1
+        print(self.accountid)
+        self.reqAccountUpdates(True, self.accountid)
+
+    #######Request#########
+
+    #######CancelRequests#########
+    def cancel_market_data(self, request_id):
+        self.cancelMktData(request_id)
+        self.requests["market_data"].pop(request_id)
+
+    def cancel_account_info(self, request_id):
+        self.cancelAccountSummary(request_id)
+        self.requests["account_info"].remove(request_id)
+
+    def cancel_all_requests(self):
+        for request_id in list(self.requests["market_data"].keys()):
+          self.cancel_market_data(request_id)
+        for request_id in list(self.requests["account_info"]):
+          self.cancel_account_info(request_id)
+    #######CancelRequests#########
+
+    #########Order##########
+    def place_order(self,contract,order):
+        self.orderid += 1
+        self.placeOrder(self.orderid, contract, order)
+        self.reqIds(1)
+
+    def cancel_order(self, orderid):
+        self.cancelOrder(orderid)
+    #########Order##########
+
+   
+def main():
+    logging.basicConfig(level = logging.ERROR)
+
+    localhostname = "DESKTOP-51IRLB5.local"
+    localIp = "127.0.0.1"
+
+    cmdLineParser = argparse.ArgumentParser("api tests")
+    cmdLineParser.add_argument("-p", "--port", action="store", type=int,
+                                  dest="port", default=7497, help="The TCP port to use")
+    cmdLineParser.add_argument("-C", "--global-cancel", action="store_true",
+                                  dest="global_cancel", default=False,
+                                  help="whether to trigger a globalCancel req")
+    args = cmdLineParser.parse_args()
+    print("Using args", args)
+
+    app = IBGateway()
+
+
+    app.connect_and_run(localIp, args.port, 0)
+
+ 
+  
+  
+  
+
+
+  
+
+  
+
+  
+  
+
+if __name__ == "__main__":
+  main()
