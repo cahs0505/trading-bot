@@ -9,7 +9,7 @@ from threading import Thread
 from typing import Optional, Dict, Any, List
 
 import ibapi
-from ibapi import wrapper
+from ibapi.wrapper import EWrapper
 from ibapi.client import EClient
 from ibapi.wrapper import *
 from ibapi.ticktype import *
@@ -29,27 +29,21 @@ MARKET_DATA_TYPE = {
     "DELAYED_FROZEN":4
 }
 
-class TestWrapper(wrapper.EWrapper):
-  def __init__(self):
-    wrapper.EWrapper.__init__(self)
-    
-class TestClient(EClient):
-  def __init__(self, wrapper):
-    EClient.__init__(self, wrapper)
-
-class IBGateway(TestWrapper, TestClient):
+class IBGateway(EWrapper):
 
     def __init__(self):
 
-        TestWrapper.__init__(self)
-        TestClient.__init__(self, wrapper=self)
+        EWrapper.__init__(self)
+        # EClient.__init__(self, wrapper=self)
+
+        self.client: EClient = EClient(self)
 
         self.host: str = ""
         self.port: int = None
         self.clientid: int = 0
         self.accountid: str = ""  
         
-        self.connected: bool = False
+        self.connection_status: bool = False
         self.account_summary: Dict = {}
         self.requests : Dict = {
                                 "market_data": {},
@@ -76,19 +70,27 @@ class IBGateway(TestWrapper, TestClient):
         self.host = host
         self.port = port
         self.clientid = clientid
-        self.accountid = accountid
+        self.accountid = accountid       
 
-        self.connect(self.host, self.port, self.clientid)
-        self.thread = Thread(target=self.run)
+        self.client.connect(self.host, self.port, self.clientid)
+        self.connection_status = True
+        self.thread = Thread(target=self.client.run)
         self.thread.start()
 
     def disconnect(self):
-        return super().disconnect()
+        # if not self.connection_status:
+        #     return 
+        
+        # self.connection_status = False
+        self.client.disconnect()
       
     def check_connection(self):
-        if self.isConnected():
+        if self.client.isConnected():
             return
         
+        if self.connection_status:
+            self.disconnect()
+
         self.connect_and_run(self.host,self.port,self.clientid)
     ####Connection########
 
@@ -305,7 +307,7 @@ class IBGateway(TestWrapper, TestClient):
     #######Request#########
 
     def request_market_data_type(self,type):
-       self.reqMarketDataType(MARKET_DATA_TYPE[type])
+       self.client.reqMarketDataType(MARKET_DATA_TYPE[type])
 
     def request_market_data(self,sec_type,symbol):
         if not self.requests["market_data"]:
@@ -314,9 +316,9 @@ class IBGateway(TestWrapper, TestClient):
             request_id = max(k for k, v in self.requests["market_data"].items()) + 1
         self.ticks[symbol] = dict()
         if sec_type == "STK":
-            self.reqMktData(request_id, Contracts.USStockAtSmart(symbol), "", False, False, [])
+            self.client.reqMktData(request_id, Contracts.USStockAtSmart(symbol), "", False, False, [])
         elif sec_type == "CASH":
-            self.reqMktData(request_id, Contracts.Fx(symbol,"USD"), "", False, False, [])
+            self.client.reqMktData(request_id, Contracts.Fx(symbol,"USD"), "", False, False, [])
         
         self.requests["market_data"][request_id] = symbol
 
@@ -326,7 +328,7 @@ class IBGateway(TestWrapper, TestClient):
         else:
             request_id = max(self.requests["account_info"]) + 1
           
-        self.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
+        self.client.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
         self.requests["account_info"].add(request_id)
 
     def request_position(self):
@@ -335,7 +337,7 @@ class IBGateway(TestWrapper, TestClient):
         else:
             request_id = max(self.requests["position"]) + 1
           
-        self.reqPositions()
+        self.client.reqPositions()
         self.requests["position"].add(request_id)
 
     def request_open_orders(self):
@@ -344,7 +346,7 @@ class IBGateway(TestWrapper, TestClient):
         else:
             request_id = max(self.requests["open_orders"]) + 1
 
-        self.reqOpenOrders()
+        self.client.reqOpenOrders()
         self.requests["open_orders"].add(request_id)
 
     def request_account_updates(self):
@@ -353,17 +355,17 @@ class IBGateway(TestWrapper, TestClient):
         else:
             request_id = max(self.requests["account_updates"]) + 1
         print(self.accountid)
-        self.reqAccountUpdates(True, self.accountid)
+        self.client.reqAccountUpdates(True, self.accountid)
 
     #######Request#########
 
     #######CancelRequests#########
     def cancel_market_data(self, request_id):
-        self.cancelMktData(request_id)
+        self.client.cancelMktData(request_id)
         self.requests["market_data"].pop(request_id)
 
     def cancel_account_info(self, request_id):
-        self.cancelAccountSummary(request_id)
+        self.client.cancelAccountSummary(request_id)
         self.requests["account_info"].remove(request_id)
 
     def cancel_all_requests(self):
@@ -376,11 +378,11 @@ class IBGateway(TestWrapper, TestClient):
     #########Order##########
     def place_order(self,contract,order):
         self.orderid += 1
-        self.placeOrder(self.orderid, contract, order)
-        self.reqIds(1)
+        self.client.placeOrder(self.orderid, contract, order)
+        self.client.reqIds(1)
 
     def cancel_order(self, orderid):
-        self.cancelOrder(orderid)
+        self.client.cancelOrder(orderid)
     #########Order##########
 
    

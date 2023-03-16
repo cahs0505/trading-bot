@@ -5,6 +5,7 @@ import datetime
 import time
 import pytz
 import logging
+import signal
 
 from util import log,check_trading_hours,check_trading_days,check_exchange_active, time_until_exchange_start,time_until_exchange_end
 
@@ -41,6 +42,8 @@ ACTION = {
 #8 Alternative Data Source 
 #9 error handling
 
+
+
 #######To Do###########
 class MainBot :
 
@@ -54,13 +57,17 @@ class MainBot :
         self.api = IBGateway()
         self.strategy = SpreadStrategy(_main_bot = self)
 
+        self.run_strategy : bool = False
+
         self.currency = "USD"
         self.position = None
         self.exchange = None
         self.exchange_active = None
+        signal.signal(signal.SIGINT, self.keyboardInterruptHandler)
 
     def start(self):                                               
         self.api.connect_and_run(self.host,self.port,0,self.accountid)
+        self.run_strategy = True
         self.strategy.start()
     
     def order(                                                  #to be refactor 
@@ -90,28 +97,25 @@ class MainBot :
     
     def close(self):
         log("Closing app...")
-
         self.strategy.stop()
-        if self.api.isConnected():
+
+        if self.api.client.isConnected():
             self.api.disconnect()
         
     def add_strategy(self, strategy):
         self.strategy = SpreadStrategy(_main_bot = self)
 
-            
+    def keyboardInterruptHandler(self, signal, frame):
+        print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up...".format(signal))
+        self.strategy.stop()
+        if self.api.client.isConnected():
+            self.api.disconnect()
+
 def main():
-    logging.basicConfig(level = logging.ERROR)
+
     app = MainBot ()
-    try:
-        app.start()
-        while app.strategy.thread.is_alive():
-            app.strategy.thread.join(1)                                          ####?????###
-    except KeyboardInterrupt:
-        print("exit")
-        time.sleep(3)
-        app.close()
-        
-  
+    app.start()
+
 if __name__ == "__main__":
   
   main()   
