@@ -118,10 +118,11 @@ class SpreadStrategy :
             time.sleep(5)
             
             self.exchange_active = check_exchange_active(self.exchange)
-            # log(f"ACCOUNT {self.api.account_summary}")
+            self.logger.info(f"ACCOUNT {exchange_time()}: {self.api.account_summary}")
             self.logger.info(f"POSITIONS {exchange_time()}: {self.api.my_position}")
+            self.logger.info(f"PORTFOLIO {exchange_time()}: {self.api.portfolio}")
             self.logger.info(f"ORDER {exchange_time()}: {self.api.orders}")
-            # self.logger.info(f"REQUESTS {exchange_time()}: {self.api.requests}")
+            self.logger.info(f"REQUESTS {exchange_time()}: {self.api.requests}")
 
             if not self.exchange_active:
                 self.logger.warning(f"{self.exchange} active in {':'.join(str(time_until_exchange_start(self.exchange)).split(':')[:2])}")
@@ -132,6 +133,16 @@ class SpreadStrategy :
                 self.logger.warning(f"{self.exchange} down in {':'.join(str(time_until_exchange_end(self.exchange)).split(':')[:2])}, cancelling unfilled order, stopping trades")
                 self.cancel_all_order()
                 continue
+
+            if(not self.api.ticks[self.symbol_first] or
+               not self.api.ticks[self.symbol_second] or
+                self.api.ticks[self.symbol_first]["bid"] == 0 or
+               self.api.ticks[self.symbol_first]["ask"] == 0 or
+               self.api.ticks[self.symbol_second]["bid"] == 0 or
+                self.api.ticks[self.symbol_second]["ask"] == 0):
+                self.logger.warnning("ticks malfunctioned, skipping")
+                continue
+
 
             self.logger.info(f"TICKS {exchange_time()}: {self.api.ticks}")
             self.check_position ()     
@@ -176,7 +187,7 @@ class SpreadStrategy :
                     self.logger.critical(f"ALGO {exchange_time()}: Buy spread at z-score: {long_zScore}")
                     self.buy_spread()
         
-        # self.logger.error("disconnected, reconneting")
-        # self.api.check_connection()
+        # # self.logger.error("disconnected, reconneting")
+        # # self.api.check_connection()
         
                     

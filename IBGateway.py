@@ -1,12 +1,8 @@
 import argparse
-import sys
-from time import sleep
-from datetime import datetime
-import pytz
-import time
+
 import logging
 from threading import Thread
-from typing import Optional, Dict, Any, List
+from typing import Dict
 
 import ibapi
 from ibapi.wrapper import EWrapper
@@ -34,7 +30,6 @@ class IBGateway(EWrapper):
     def __init__(self):
 
         EWrapper.__init__(self)
-        # EClient.__init__(self, wrapper=self)
 
         self.client: EClient = EClient(self)
 
@@ -54,6 +49,7 @@ class IBGateway(EWrapper):
                               } 
         self.ticks: Dict = {}
         self.my_position: Dict = {}
+        self.portfolio: Dict ={}
         self.orderid: int = 0
         self.orders: Dict = {}
   
@@ -121,31 +117,30 @@ class IBGateway(EWrapper):
 
     def tickPrice(
         self, 
-        request_id: TickerId, 
+        req: TickerId, 
         tickType: TickType, 
         price: float,
         attrib: TickAttrib
     ): 
-        super().tickPrice(request_id, tickType, price, attrib)
-        # print(datetime.now(pytz.timezone('US/Eastern')),"TickPrice. TickerId:", request_id, "tickType:", tickType,
-        #         "Price:", floatMaxString(price), "CanAutoExecute:", attrib.canAutoExecute,
-        #         "PastLimit:", attrib.pastLimit, end=' ')
+        super().tickPrice(req, tickType, price, attrib)
 
-        if tickType == 1 or 66:
-          symbol = self.requests["market_data"][request_id]
-          self.ticks[symbol]["bid"] = price
-        
-        if tickType == 2 or 67:
-          symbol = self.requests["market_data"][request_id]
-          self.ticks[symbol]["ask"] = price
+        if tickType == 1 or tickType == 66:
+          
+          if price != 0:
+            symbol = self.requests["market_data"][req]
+            self.ticks[symbol]["bid"] = price
+           
+        if tickType == 2 or tickType == 67:
+          
+          if price != 0:
+            symbol = self.requests["market_data"][req]
+            self.ticks[symbol]["ask"] = price
 
-        if tickType == 4 or 68:
-          symbol = self.requests["market_data"][request_id]
-          self.ticks[symbol]["last_price"] = price
-
-            # print(datetime.now(pytz.timezone('US/Eastern')), symbol, self.ticks[symbol])
-          # if tickType == TickTypeEnum.BID or tickType == TickTypeEnum.ASK:
-          #     print("PreOpen:", attrib.preOpen)
+        if tickType == 4 or tickType == 68:
+          
+          if price != 0:
+            symbol = self.requests["market_data"][req]
+            self.ticks[symbol]["last_price"] = price
         
     def contractDetails(self, reqId, contractDetails):
         print(f"contract details: {contractDetails}")
@@ -165,9 +160,6 @@ class IBGateway(EWrapper):
         super().accountSummary(reqId, account, tag, value, currency)
 
         self.account_summary[tag] = (value,currency)
-        # print(datetime.now(pytz.timezone('US/Eastern')),self.account_summary)
-        # print("AccountSummary. ReqId:", reqId, "Account:", account,
-        #       "Tag: ", tag, "Value:", value, "Currency:", currency)
 
     def accountSummaryEnd(self, reqId: int):  
         super().accountSummaryEnd(reqId)
@@ -189,10 +181,6 @@ class IBGateway(EWrapper):
                                                 "avg_cost":floatMaxString(avgCost)
                                                 }
         
-        # print("Position.", "Account:", account, "Symbol:", contract.symbol, "SecType:",
-        #       contract.secType, "Currency:", contract.currency,
-        #       "Position:", decimalMaxString(position), "Avg cost:", floatMaxString(avgCost))
-        
     def positionEnd(self):
         super().positionEnd()
         print("PositionEnd")
@@ -209,14 +197,7 @@ class IBGateway(EWrapper):
         )
 
         orderid: str = str(orderId)
-        # print("OpenOrder. PermId:", intMaxString(order.permId), "ClientId:", intMaxString(order.clientId), " OrderId:", intMaxString(orderId), 
-        #       "Account:", order.account, "Symbol:", contract.symbol, "SecType:", contract.secType,
-        #       "Exchange:", contract.exchange, "Action:", order.action, "OrderType:", order.orderType,
-        #       "TotalQty:", decimalMaxString(order.totalQuantity), "CashQty:", floatMaxString(order.cashQty), 
-        #       "LmtPrice:", floatMaxString(order.lmtPrice), "AuxPrice:", floatMaxString(order.auxPrice), "Status:", orderState.status,
-        #       "MinTradeQty:", intMaxString(order.minTradeQty), "MinCompeteSize:", intMaxString(order.minCompeteSize),
-        #     "competeAgainstBestOffset:", floatMaxString(order.midOffsetAtWhole),"MidOffsetAtHalf:" ,floatMaxString(order.midOffsetAtHalf))
-
+    
         self.orders[orderid] = {
                                 "symbol": contract.symbol,
                                 "sec_type": contract.secType,
@@ -258,11 +239,6 @@ class IBGateway(EWrapper):
         )
 
         orderid: str = str(orderId)      
-        # print("OrderStatus. Id:", orderId, "Status:", status, "Filled:", decimalMaxString(filled),
-        #       "Remaining:", decimalMaxString(remaining), "AvgFillPrice:", floatMaxString(avgFillPrice),
-        #       "PermId:", intMaxString(permId), "ParentId:", intMaxString(parentId), "LastFillPrice:",
-        #     floatMaxString(lastFillPrice), "ClientId:", intMaxString(clientId), "WhyHeld:",
-        #     whyHeld, "MktCapPrice:", floatMaxString(mktCapPrice))
 
         self.orders[orderid].update({
                                     "filled": filled,
@@ -296,11 +272,16 @@ class IBGateway(EWrapper):
         super().updatePortfolio(contract, position, marketPrice, marketValue,
                             averageCost, unrealizedPNL, realizedPNL, accountName)
         
-        print("UpdatePortfolio.", "Symbol:", contract.symbol, "SecType:", contract.secType, "Exchange:",
-            contract.exchange, "Position:", decimalMaxString(position), "MarketPrice:", floatMaxString(marketPrice),
-            "MarketValue:", floatMaxString(marketValue), "AverageCost:", floatMaxString(averageCost),
-            "UnrealizedPNL:", floatMaxString(unrealizedPNL), "RealizedPNL:", floatMaxString(realizedPNL),
-            "AccountName:", accountName)
+        self.portfolio[contract.symbol] = {
+                                            "sec_type": contract.secType,
+                                            "exchange": contract.exchange,
+                                            "position": decimalMaxString(position),
+                                            "market_price": floatMaxString(marketPrice),
+                                            "market_value": floatMaxString(marketValue),
+                                            "average_cost": floatMaxString(averageCost),
+                                            "unrealized_PnL": floatMaxString(unrealizedPNL),
+                                            "realized_PnL": floatMaxString(realizedPNL),                          
+                                            }
 
     ########Receving########
 
@@ -404,20 +385,8 @@ def main():
     app = IBGateway()
 
 
-    app.connect_and_run(localIp, args.port, 0)
+    app.connect_and_run(localIp, 7497  , 0,"DU6734746" )
 
- 
-  
-  
-  
-
-
-  
-
-  
-
-  
-  
 
 if __name__ == "__main__":
   main()

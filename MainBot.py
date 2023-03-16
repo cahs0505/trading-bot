@@ -1,10 +1,8 @@
 from IBGateway import IBGateway
 from SpreadStrategy import SpreadStrategy
-from threading import Thread
 import datetime
-import time
-import pytz
-import logging
+import os
+import json
 import signal
 
 from util import log,check_trading_hours,check_trading_days,check_exchange_active, time_until_exchange_start,time_until_exchange_end
@@ -99,17 +97,31 @@ class MainBot :
         log("Closing app...")
         self.strategy.stop()
 
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
+        PATH = "PnL.json"
+        if not os.path.isfile(PATH):
+            data = {now:self.api.portfolio}
+            with open(PATH, 'w') as f:
+                json.dump(data,f)
+        else:
+
+            with open(PATH,'r') as t:
+                data = json.load(t)
+
+            data[now] = self.api.portfolio
+            
+            with open(PATH, 'w') as f:
+                json.dump(data,f)
+
         if self.api.client.isConnected():
             self.api.disconnect()
-        
+            
     def add_strategy(self, strategy):
         self.strategy = SpreadStrategy(_main_bot = self)
 
     def keyboardInterruptHandler(self, signal, frame):
         print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up...".format(signal))
-        self.strategy.stop()
-        if self.api.client.isConnected():
-            self.api.disconnect()
+        self.close()
 
 def main():
 
