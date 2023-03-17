@@ -68,31 +68,6 @@ class MainBot :
         self.run_strategy = True
         self.strategy.start()
     
-    def order(                                                  #to be refactor 
-        self, 
-        sec_type,
-        order_type,
-        action, 
-        symbol, 
-        quantity, 
-        price
-    ):
-        if sec_type == "STK":                                                          
-            contract = Contracts.USStockAtSmart(symbol)
-        elif sec_type == "CASH":
-            contract = Contracts.Fx(symbol, "USD")
-        elif sec_type == "CMDTY":
-            contract = Contracts.Commodity(symbol)
-
-        if order_type == "LIMIT":                                                      
-            order = Orders.LimitOrder(action,quantity,price)
-        elif order_type == "MARKET":
-            order = Orders.MarketOrder(action,quantity)
-        elif order_type == "MID_PRICE":
-            order = Orders.Midprice(action,quantity)
-
-        self.api.place_order(contract,order)
-    
     def close(self):
         log("Closing app...")
         self.strategy.stop()
@@ -115,7 +90,7 @@ class MainBot :
 
         if self.api.client.isConnected():
             self.api.disconnect()
-            
+
     def add_strategy(self, strategy):
         self.strategy = SpreadStrategy(_main_bot = self)
 
@@ -126,6 +101,7 @@ class MainBot :
 def main():
 
     app = MainBot ()
+
     app.start()
 
 if __name__ == "__main__":

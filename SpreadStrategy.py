@@ -15,6 +15,7 @@ class SpreadStrategy :
 
         self._run = True
         
+        self.name: str = ""
         self.exchange: str = ""
         self.sec_type: str = ""
         self.symbol_first: str = ""
@@ -30,9 +31,8 @@ class SpreadStrategy :
         self.current_position: int = 0
         self.unfilled_order: bool = False
 
-        setup_logger('spread1',"logs/strategy/spread1.log")
-        self.logger = logging.getLogger('spread1')
-        self.logger.critical('test')
+
+
        
     def load_param (self):
         f = open("config/strategy/strategy_param_1.json")
@@ -42,14 +42,14 @@ class SpreadStrategy :
                 setattr(self, key, value)
        
     def buy_spread (self):                                                    
-        self.main_bot.order(self.sec_type,"LIMIT","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
-        self.main_bot.order(self.sec_type,"LIMIT","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
+        self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
+        self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
         self.logger.critical(f"ALGO {exchange_time()}: Buy {self.symbol_first} at {self.api.ticks[self.symbol_first]['ask']}")
         self.logger.critical(f"ALGO {exchange_time()}: Sell {self.symbol_second} at {self.api.ticks[self.symbol_second]['bid']}")
 
     def sell_spread (self):                                                   
-        self.main_bot.order(self.sec_type,"LIMIT","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
-        self.main_bot.order(self.sec_type,"LIMIT","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
+        self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
+        self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
         self.logger.critical(f"ALGO {exchange_time()}: Sell {self.symbol_first} at {self.api.ticks[self.symbol_first]['bid']}")
         self.logger.critical(f"ALGO {exchange_time()}: Buy {self.symbol_second} at {self.api.ticks[self.symbol_second]['ask']}")
 
@@ -97,7 +97,9 @@ class SpreadStrategy :
 
     def run(self):
         time.sleep(3)  
-        self.load_param() 
+        self.load_param()
+        setup_logger(self.name,f"logs/strategy/{self.name}.log")
+        self.logger = logging.getLogger(self.name) 
 
         self.exchange_active = check_exchange_active(self.exchange)
         self.api.request_account_info()
@@ -133,7 +135,8 @@ class SpreadStrategy :
                 self.logger.warning(f"{self.exchange} down in {':'.join(str(time_until_exchange_end(self.exchange)).split(':')[:2])}, cancelling unfilled order, stopping trades")
                 self.cancel_all_order()
                 continue
-
+            
+            #check if ticks function normally
             if(not self.api.ticks[self.symbol_first] or
                not self.api.ticks[self.symbol_second] or
                 self.api.ticks[self.symbol_first]["bid"] == 0 or

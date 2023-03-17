@@ -357,7 +357,29 @@ class IBGateway(EWrapper):
     #######CancelRequests#########
 
     #########Order##########
-    def place_order(self,contract,order):
+    def order(                                                  #to be refactor 
+        self, 
+        sec_type,
+        order_type,
+        action, 
+        symbol, 
+        quantity, 
+        price
+    ):
+        if sec_type == "STK":                                                          
+            contract = Contracts.USStockAtSmart(symbol)
+        elif sec_type == "CASH":
+            contract = Contracts.Fx(symbol, "USD")
+        elif sec_type == "CMDTY":
+            contract = Contracts.Commodity(symbol)
+
+        if order_type == "LIMIT":                                                      
+            order = Orders.LimitOrder(action,quantity,price)
+        elif order_type == "MARKET":
+            order = Orders.MarketOrder(action,quantity)
+        elif order_type == "MID_PRICE":
+            order = Orders.Midprice(action,quantity)
+
         self.orderid += 1
         self.client.placeOrder(self.orderid, contract, order)
         self.client.reqIds(1)
