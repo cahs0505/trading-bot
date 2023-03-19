@@ -3,19 +3,26 @@ import logging
 import pytz
 
 TRADING_HOURS = {
-    "NASDAQ" : (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0))       # 9:30am to 4:00pm
+    "NASDAQ" : (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0)),      \
+    "NYSE": (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0)),
+    "HKEX": (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0))
 }
 
 TRADING_DAYS = {
-    "NASDAQ" : range(0,4)                                               # Monday to Friday
+    "NASDAQ" : range(5),
+    "NYSE": range(5),
+    "HKEX": range(5),                                                                                                                                                                                    # Monday to Friday
+}
+
+TIMEZONE = {
+    "NASDAQ" : "US/Eastern",
+    "NYSE": "US/Eastern",
+    "HKEX": "Asia/Hong_Kong"
 }
 
 
-def log(message):
-    print(datetime.datetime.now(pytz.timezone('US/Eastern')).strftime("%Y-%m-%d %H:%M:%S"),message)
-    
-def exchange_time():
-    return datetime.datetime.now(pytz.timezone('US/Eastern')).strftime("%Y-%m-%d %H:%M:%S")
+def exchange_time(exchange):
+    return datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).strftime("%Y-%m-%d %H:%M:%S")
 
 def setup_logger(logger_name, log_file, level=logging.INFO):
     l = logging.getLogger(logger_name)
@@ -35,42 +42,55 @@ def setup_logger(logger_name, log_file, level=logging.INFO):
     l.propagate = False    
 
 def check_trading_hours(exchange):
-    return TRADING_HOURS[exchange][0] <=datetime.datetime.now(pytz.timezone('US/Eastern')).time() <= TRADING_HOURS[exchange][1]
+    return TRADING_HOURS[exchange][0] <=datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).time() <= TRADING_HOURS[exchange][1]
 
 
 def check_trading_days(exchange):
-    return datetime.datetime.now(pytz.timezone('US/Eastern')).weekday() in TRADING_DAYS[exchange]
+    return datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).weekday() in TRADING_DAYS[exchange]
 
 
 def check_exchange_active(exchange):
     return check_trading_hours(exchange) and check_trading_days(exchange)
 
 def time_until_exchange_start(exchange):
-    now = datetime.datetime.now(pytz.timezone('US/Eastern')).replace(tzinfo=None)
-    next_start = datetime.datetime.combine(now,TRADING_HOURS[exchange][0]) 
+    now = datetime.datetime.now(pytz.timezone(TIMEZONE[exchange]))
+    day = datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).weekday()
 
-    if now > next_start:
-        next_start += datetime.timedelta(days=1)
+    if day in range (4) or day == 6:
+        day_diff = 1
+    elif day == 4:
+        day_diff = 3
+    elif day == 5:
+        day_diff = 2
 
-    return next_start - now 
-
+    day = datetime.date.today() + datetime.timedelta(days=day_diff)
+    next_start = datetime.datetime.combine(day,TRADING_HOURS[exchange][0]) 
+  
+    return next_start - now.replace(tzinfo=None)
+  
 def time_until_exchange_end(exchange):
-    now = datetime.datetime.now(pytz.timezone('US/Eastern')).replace(tzinfo=None)
-    next_end = datetime.datetime.combine(now,TRADING_HOURS[exchange][1]) 
 
-    if now > next_end:
-        next_end += datetime.timedelta(days=1)
+    if check_exchange_active(exchange):
+        now = datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).replace(tzinfo=None)
+        next_end = datetime.datetime.combine(now,TRADING_HOURS[exchange][1]) 
 
-    return next_end - now
+        return next_end - now
+    
+    else:
+        exchange_duration = datetime.datetime.combine(datetime.date.today(),TRADING_HOURS[exchange][1]) - datetime.datetime.combine(datetime.date.today(),TRADING_HOURS[exchange][0])
+        return time_until_exchange_start(exchange) + exchange_duration
     
 def main():
-
+    # print(pytz.all_timezones)
     print(check_trading_hours("NASDAQ"))
     print(check_trading_days("NASDAQ"))
     print(check_exchange_active("NASDAQ"))
     print(time_until_exchange_start("NASDAQ"))
     print(time_until_exchange_end("NASDAQ"))
+    # print(datetime.datetime.now(pytz.timezone(TIMEZONE["NASDAQ"])).weekday())
 
+    # print(time_until_exchange_start("NASDAQ") + datetime.timedelta(minutes=10))
+    # print(time_until_exchange_start("NASDAQ") >datetime.timedelta(hours = 5))
 if __name__ == "__main__":
   
   main()   
