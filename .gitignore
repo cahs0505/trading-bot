@@ -1,0 +1,9 @@
+config/
+__pycache__/
+logs/
+
+foo.py
+UI.py
+run.py
+
+PnL.json

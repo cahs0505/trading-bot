@@ -42,9 +42,9 @@ class IBGateway(EWrapper):
         self.account_summary: Dict = {}
         self.requests : Dict = {
                                 "market_data": {},
-                                "account_info": set(),
-                                "position": set(),
-                                "open_orders": set(),
+                                "account_info": {},
+                                "position": {},
+                                "open_orders": {},
                                 "account_updates" : {}
                               } 
         self.ticks: Dict = {}
@@ -52,6 +52,7 @@ class IBGateway(EWrapper):
         self.portfolio: Dict ={}
         self.orderid: int = 0
         self.orders: Dict = {}
+        self.errors : list = []
   
       
     ####Connection########
@@ -112,8 +113,18 @@ class IBGateway(EWrapper):
 
         if advancedOrderRejectJson:
             print("Error. Id:", reqId, "Code:", errorCode, "Msg:", errorString, "AdvancedOrderRejectJson:", advancedOrderRejectJson)
+            
         else:
             print("Error. Id:", reqId, "Code:", errorCode, "Msg:", errorString)
+
+        #error handling for requests
+        
+        error = {
+            "request_id": reqId,
+            "error_code": errorCode,
+        }
+        self.errors.append(error)
+        
 
     def tickPrice(
         self, 
@@ -127,19 +138,19 @@ class IBGateway(EWrapper):
         if tickType == 1 or tickType == 66:
           
           if price != 0:
-            symbol = self.requests["market_data"][req]
+            symbol = self.requests["market_data"][req]["symbol"]
             self.ticks[symbol]["bid"] = price
            
         if tickType == 2 or tickType == 67:
           
           if price != 0:
-            symbol = self.requests["market_data"][req]
+            symbol = self.requests["market_data"][req]["symbol"]
             self.ticks[symbol]["ask"] = price
 
         if tickType == 4 or tickType == 68:
           
           if price != 0:
-            symbol = self.requests["market_data"][req]
+            symbol = self.requests["market_data"][req]["symbol"]
             self.ticks[symbol]["last_price"] = price
         
     def contractDetails(self, reqId, contractDetails):
@@ -301,7 +312,9 @@ class IBGateway(EWrapper):
         elif sec_type == "CASH":
             self.client.reqMktData(request_id, Contracts.Fx(symbol,"USD"), "", False, False, [])
         
-        self.requests["market_data"][request_id] = symbol
+        self.requests["market_data"][request_id] = {"symbol": symbol,
+                                                    "sec_type": sec_type,
+                                                    "error": None}
 
     def request_account_info(self):
         if not self.requests["account_info"]:
@@ -310,7 +323,7 @@ class IBGateway(EWrapper):
             request_id = max(self.requests["account_info"]) + 1
           
         self.client.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
-        self.requests["account_info"].add(request_id)
+        self.requests["account_info"][request_id] = {"error": None}
 
     def request_position(self):
         if not self.requests["position"]:
@@ -319,7 +332,7 @@ class IBGateway(EWrapper):
             request_id = max(self.requests["position"]) + 1
           
         self.client.reqPositions()
-        self.requests["position"].add(request_id)
+        self.requests["position"][request_id] = {"error": None}
 
     def request_open_orders(self):
         if not self.requests["open_orders"]:
@@ -328,15 +341,16 @@ class IBGateway(EWrapper):
             request_id = max(self.requests["open_orders"]) + 1
 
         self.client.reqOpenOrders()
-        self.requests["open_orders"].add(request_id)
+        self.requests["open_orders"][request_id] = {"error": None}
 
     def request_account_updates(self):
         if not self.requests["account_updates"]:
             request_id = 5000
         else:
             request_id = max(self.requests["account_updates"]) + 1
-        print(self.accountid)
+        
         self.client.reqAccountUpdates(True, self.accountid)
+        self.requests["account_updates"][request_id] = {"error": None}
 
     #######Request#########
 

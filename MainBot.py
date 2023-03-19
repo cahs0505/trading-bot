@@ -78,8 +78,8 @@ class MainBot :
         for strategy in self.strategy:
             strategy.start()
 
-        self._logging_thread: Thread = Thread(target=self._logging_thread)
-        self._logging_thread.start()
+        self._thread: Thread = Thread(target=self._main_thread)
+        self._thread.start()
             
     
     def close(self):
@@ -95,7 +95,7 @@ class MainBot :
         if not os.path.isfile(PATH):
             data = {now:self.api.portfolio}
             with open(PATH, 'w') as f:
-                json.dump(data,f)
+                json.dump(data,f, indent=2)
         else:
 
             with open(PATH,'r') as t:
@@ -104,7 +104,7 @@ class MainBot :
             data[now] = self.api.portfolio
             
             with open(PATH, 'w') as f:
-                json.dump(data,f)
+                json.dump(data,f, indent=2)
 
         if self.api.client.isConnected():
             self.api.disconnect()
@@ -119,17 +119,31 @@ class MainBot :
         self.close()
 
     def _main_thread (self):
-        pass
-
-    def _logging_thread (self):
         
         while self.active:
-            time.sleep(60)
+            time.sleep(30)
             self.logger.info(f"ACCOUNT {exchange_time(self.exchange)}: {self.api.account_summary}")
             self.logger.info(f"POSITIONS {exchange_time(self.exchange)}: {self.api.my_position}")
             self.logger.info(f"PORTFOLIO {exchange_time(self.exchange)}: {self.api.portfolio}")
             self.logger.info(f"ORDER {exchange_time(self.exchange)}: {self.api.orders}")
             self.logger.info(f"REQUESTS {exchange_time(self.exchange)}: {self.api.requests}")
+            
+
+            #error handling, to be refactored and extended
+            while self.api.errors :
+                error = self.api.errors.pop()
+                if error["request_id"] // 1000 == 1:
+                    request = self.api.requests["market_data"][error["request_id"]]
+                    
+                    if error["error_code"] == 354:
+                        
+                        self.logger.error(f"ERROR {exchange_time(self.exchange)}: {error['error_code']}")
+                        self.logger.error(f"ERROR {exchange_time(self.exchange)}: requesting again")
+                        self.api.request_market_data(request["sec_type"],request["symbol"])
+
+            if not self.api.client.isConnected:
+                self.api.check_connection()
+
 
         
 
