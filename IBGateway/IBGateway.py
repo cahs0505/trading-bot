@@ -259,17 +259,20 @@ class IBGateway(EWrapper):
         if self.orders[orderid]['status'] == "Filled":
            self.orders.pop(orderid)
 
-    # def updateAccountValue(self, 
-    #     key: str, 
-    #     val: str, 
-    #     currency: str,
-    #     accountName: str
-    # ):
-    #     super().updateAccountValue(key, val, currency, accountName)
-
-    #     print("UpdateAccountValue. Key:", key, "Value:", val,
-    #                 "Currency:", currency, "AccountName:", accountName)
+    #  After the initial callback to updateAccountValue, callbacks only occur for values which have changed. 
+    # This occurs at the time of a position change, or every 3 minutes at most. 
+    def updateAccountValue(self, 
+        key: str, 
+        val: str, 
+        currency: str,
+        accountName: str
+    ):
+        super().updateAccountValue(key, val, currency, accountName)
         
+        # print("UpdateAccountValue. Key:", key, "Value:", val,
+        #             "Currency:", currency, "AccountName:", accountName)
+    
+    #After the initial callback to updatePortfolio, callbacks only occur for positions which have changed. 
     def updatePortfolio(self, 
                         contract: Contract, 
                         position: Decimal,
@@ -293,7 +296,7 @@ class IBGateway(EWrapper):
                                             "unrealized_PnL": floatMaxString(unrealizedPNL),
                                             "realized_PnL": floatMaxString(realizedPNL),                          
                                             }
-
+        
     ########Receving########
 
     #######Request#########

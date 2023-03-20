@@ -41,21 +41,25 @@ def setup_logger(logger_name, log_file, level=logging.INFO):
     l.setLevel(logging.INFO)
     l.propagate = False    
 
-def check_trading_hours(exchange):
-    return TRADING_HOURS[exchange][0] <=datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).time() <= TRADING_HOURS[exchange][1]
+def check_trading_hours(exchange,buffer=0):
+    return (datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0])+datetime.timedelta(minutes=buffer)).time() <=datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).time() <= TRADING_HOURS[exchange][1]
 
 
 def check_trading_days(exchange):
     return datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).weekday() in TRADING_DAYS[exchange]
 
 
-def check_exchange_active(exchange):
-    return check_trading_hours(exchange) and check_trading_days(exchange)
+def check_exchange_active(exchange, buffer=0):
+    return check_trading_hours(exchange,buffer=buffer) and check_trading_days(exchange)
 
 def time_until_exchange_start(exchange):
     now = datetime.datetime.now(pytz.timezone(TIMEZONE[exchange]))
     day = datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).weekday()
 
+    if day in range(5) and now.replace(tzinfo=None) < datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]):
+
+        return datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]) - now.replace(tzinfo=None)
+        
     if day in range (4) or day == 6:
         day_diff = 1
     elif day == 4:
@@ -87,6 +91,9 @@ def main():
     print(check_exchange_active("NASDAQ"))
     print(time_until_exchange_start("NASDAQ"))
     print(time_until_exchange_end("NASDAQ"))
+    print(type((datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0])+datetime.timedelta(hours=1)).time()))
+    print(datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]))
+    print(datetime.datetime.now(pytz.timezone(TIMEZONE["NASDAQ"])).replace(tzinfo=None)<datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]))
     # print(datetime.datetime.now(pytz.timezone(TIMEZONE["NASDAQ"])).weekday())
 
     # print(time_until_exchange_start("NASDAQ") + datetime.timedelta(minutes=10))

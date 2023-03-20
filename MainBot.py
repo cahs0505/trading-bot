@@ -47,19 +47,19 @@ class MainBot :
 
     def __init__(self):
         
-        self.host: str = "127.0.0.1"                                         #localhost
-        self.port: int = 7497                                                #live:7496, paper:7497
+        self.host: str = ""                                        #localhost
+        self.port: int = None                                                #live:7496, paper:7497
         self.clientid: int = 0                                                  #0: default
-        self.accountid: str = "DU6734746"                                            
+        self.accountid: str = ""                                            
         
         self.api = IBGateway()
         self.strategy = []
 
         self.run_strategy : bool = False
 
-        self.currency = "USD"
+        self.currency = ""
         self.position = None
-        self.exchange = "NASDAQ"
+        self.exchange = ""
         self.exchange_active = None
         signal.signal(signal.SIGINT, self.keyboardInterruptHandler)
 
@@ -69,10 +69,11 @@ class MainBot :
 
         setup_logger("main",f"logs/main.log")
         self.logger = logging.getLogger("main") 
-
         self.logger.warning("Starting app...")
 
-        self.api.connect_and_run(self.host,self.port,0,self.accountid)
+        self.load_param()
+
+        self.api.connect_and_run(self.host,self.port,self.clientid,self.accountid)
         self.run_strategy = True
 
         for strategy in self.strategy:
@@ -80,8 +81,14 @@ class MainBot :
 
         self._thread: Thread = Thread(target=self._main_thread)
         self._thread.start()
+
+    def load_param(self):
+        f = open("config/account.json")
+        data = json.load(f)
+
+        for key, value in data.items():
+                setattr(self, key, value)
             
-    
     def close(self):
         self.logger.warning("Closing app...")
 
@@ -106,6 +113,22 @@ class MainBot :
             with open(PATH, 'w') as f:
                 json.dump(data,f, indent=2)
 
+        PATH = "account.json"
+
+        if not os.path.isfile(PATH):
+            data = {now:self.api.account_summary}
+            with open(PATH, 'w') as f:
+                json.dump(data,f, indent=2)
+        else:
+
+            with open(PATH,'r') as t:
+                data = json.load(t)
+
+            data[now] = self.api.account_summary
+            
+            with open(PATH, 'w') as f:
+                json.dump(data,f, indent=2)
+
         if self.api.client.isConnected():
             self.api.disconnect()
 
@@ -122,6 +145,10 @@ class MainBot :
         
         while self.active:
             time.sleep(30)
+
+            if not self.api.client.isConnected:
+                self.api.check_connection()
+                
             self.logger.info(f"ACCOUNT {exchange_time(self.exchange)}: {self.api.account_summary}")
             self.logger.info(f"POSITIONS {exchange_time(self.exchange)}: {self.api.my_position}")
             self.logger.info(f"PORTFOLIO {exchange_time(self.exchange)}: {self.api.portfolio}")
@@ -140,9 +167,9 @@ class MainBot :
                         self.logger.error(f"ERROR {exchange_time(self.exchange)}: {error['error_code']}")
                         self.logger.error(f"ERROR {exchange_time(self.exchange)}: requesting again")
                         self.api.request_market_data(request["sec_type"],request["symbol"])
+                        self.api.requests["market_data"].pop(error["request_id"])
 
-            if not self.api.client.isConnected:
-                self.api.check_connection()
+
 
 
         
