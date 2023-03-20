@@ -78,6 +78,7 @@ class SpreadStrategy :
                 self.unfilled_order = True  
                 break
 
+    #same instrument over differenct strategy?
     def cancel_all_order (self):
         if not self.api.orders:
             return

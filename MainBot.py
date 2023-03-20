@@ -9,24 +9,7 @@ import signal
 import logging
 import time
 
-from util import exchange_time, setup_logger, check_exchange_active, time_until_exchange_start,time_until_exchange_end, check_trading_hours,check_trading_days
-
-SEC_TYPE = {
-    "STK",
-    "CASH",
-    "CMDTY"
-}
-
-ORDER_TYPE = {
-    "LIMIT",
-    "MARKET",
-    "MID_PRICE"
-}
-
-ACTION = {
-    "BUY",
-    "SELL"
-}
+from util import *
 
 #######To Do###########
 
@@ -97,37 +80,8 @@ class MainBot :
 
         self.active = False
 
-        now = datetime.datetime.now().strftime("%Y-%m-%d")
-        PATH = "PnL.json"
-        if not os.path.isfile(PATH):
-            data = {now:self.api.portfolio}
-            with open(PATH, 'w') as f:
-                json.dump(data,f, indent=2)
-        else:
-
-            with open(PATH,'r') as t:
-                data = json.load(t)
-
-            data[now] = self.api.portfolio
-            
-            with open(PATH, 'w') as f:
-                json.dump(data,f, indent=2)
-
-        PATH = "account.json"
-
-        if not os.path.isfile(PATH):
-            data = {now:self.api.account_summary}
-            with open(PATH, 'w') as f:
-                json.dump(data,f, indent=2)
-        else:
-
-            with open(PATH,'r') as t:
-                data = json.load(t)
-
-            data[now] = self.api.account_summary
-            
-            with open(PATH, 'w') as f:
-                json.dump(data,f, indent=2)
+        save_to_json (self.api.portfolio, "PnL.json")
+        save_to_json (self.api.account_summary, "account.json")
 
         if self.api.client.isConnected():
             self.api.disconnect()
@@ -176,10 +130,10 @@ class MainBot :
 
 def main():
 
-    # while time_until_exchange_start("NASDAQ") > datetime.timedelta(minutes = 15):
+    while time_until_exchange_start("NASDAQ") > datetime.timedelta(minutes = 15):
         
-    #     print(f"exchange active in {':'.join(str(time_until_exchange_start('NASDAQ')).split(':')[:2])}")
-    #     time.sleep (60)
+        print(f"exchange active in {':'.join(str(time_until_exchange_start('NASDAQ')).split('.')[:1])}")
+        time.sleep (60)
 
     app = MainBot ()
     app.add_strategy(SpreadStrategy())

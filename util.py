@@ -1,6 +1,8 @@
 import datetime
 import logging
 import pytz
+import os
+import json
 
 TRADING_HOURS = {
     "NASDAQ" : (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0)),      \
@@ -19,6 +21,10 @@ TIMEZONE = {
     "NYSE": "US/Eastern",
     "HKEX": "Asia/Hong_Kong"
 }
+
+#add/subtract datetime.timedelta to datetime.time to return datetime.time
+def add_time(time, delta):
+    return (datetime.datetime.combine(datetime.datetime.now(),time) + delta).time()
 
 
 def exchange_time(exchange):
@@ -42,12 +48,10 @@ def setup_logger(logger_name, log_file, level=logging.INFO):
     l.propagate = False    
 
 def check_trading_hours(exchange,buffer=0):
-    return (datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0])+datetime.timedelta(minutes=buffer)).time() <=datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).time() <= TRADING_HOURS[exchange][1]
-
+    return add_time(TRADING_HOURS["NASDAQ"][0],datetime.timedelta(minutes=buffer)) <=datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).time() <= TRADING_HOURS[exchange][1]
 
 def check_trading_days(exchange):
     return datetime.datetime.now(pytz.timezone(TIMEZONE[exchange])).weekday() in TRADING_DAYS[exchange]
-
 
 def check_exchange_active(exchange, buffer=0):
     return check_trading_hours(exchange,buffer=buffer) and check_trading_days(exchange)
@@ -83,6 +87,23 @@ def time_until_exchange_end(exchange):
     else:
         exchange_duration = datetime.datetime.combine(datetime.date.today(),TRADING_HOURS[exchange][1]) - datetime.datetime.combine(datetime.date.today(),TRADING_HOURS[exchange][0])
         return time_until_exchange_start(exchange) + exchange_duration
+
+def save_to_json (data, PATH):
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+    if not os.path.isfile(PATH):
+        data = {now:data}
+        with open(PATH, 'w') as f:
+            json.dump(data,f, indent=2)
+    else:
+
+        with open(PATH,'r') as t:
+            old_data = json.load(t)
+
+        old_data[now] = data
+        
+        with open(PATH, 'w') as f:
+            json.dump(old_data,f, indent=2)
     
 def main():
     # print(pytz.all_timezones)
@@ -95,7 +116,7 @@ def main():
     print(datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]))
     print(datetime.datetime.now(pytz.timezone(TIMEZONE["NASDAQ"])).replace(tzinfo=None)<datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]))
     # print(datetime.datetime.now(pytz.timezone(TIMEZONE["NASDAQ"])).weekday())
-
+    print(add_time(TRADING_HOURS["NASDAQ"][0],datetime.timedelta(hours=-10)))
     # print(time_until_exchange_start("NASDAQ") + datetime.timedelta(minutes=10))
     # print(time_until_exchange_start("NASDAQ") >datetime.timedelta(hours = 5))
 if __name__ == "__main__":
