@@ -182,7 +182,7 @@ class SpreadStrategy :
                         self.sell_spread()
                         
                     else:
-                        self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},nothing happens")
+                        self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.entry_Zscore}),{short_zScore},({self.entry_Zscore}),nothing happens")
                         
                 #when in long position 
                 elif self.current_position == 1:                           

@@ -3,24 +3,7 @@ import logging
 import pytz
 import os
 import json
-
-TRADING_HOURS = {
-    "NASDAQ" : (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0)),      \
-    "NYSE": (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0)),
-    "HKEX": (datetime.time(9, 30, 0) ,datetime.time(16, 0, 0))
-}
-
-TRADING_DAYS = {
-    "NASDAQ" : range(5),
-    "NYSE": range(5),
-    "HKEX": range(5),                                                                                                                                                                                    # Monday to Friday
-}
-
-TIMEZONE = {
-    "NASDAQ" : "US/Eastern",
-    "NYSE": "US/Eastern",
-    "HKEX": "Asia/Hong_Kong"
-}
+from constants import *
 
 #add/subtract datetime.timedelta to datetime.time to return datetime.time
 def add_time(time, delta):

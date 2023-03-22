@@ -5,10 +5,10 @@ from typing import Dict, Any
 SETTINGS: Dict[str, Any] = {
     "base_dir": "",
     
-    "database.name": "sqlite",
-    "database.database": "database.db",
-    "database.host": "",
-    "database.port": 0,
+    "database.name": "mongodb",
+    "database.database": "mytest",
+    "database.host": "0.0.0.0",
+    "database.port": 27017,
     "database.user": "",
     "database.password": ""
 }

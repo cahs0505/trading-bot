@@ -1,4 +1,5 @@
 from IBGateway.IBGateway import IBGateway
+from MongodbDatabase.Mongodb_Database import MongodbDatabase
 from Strategy.SpreadStrategy import SpreadStrategy
 
 from threading import Thread
@@ -8,8 +9,11 @@ import json
 import signal
 import logging
 import time
+from bson.decimal128 import Decimal128
 
 from util import *
+
+from pymongo import MongoClient
 
 #######To Do###########
 
@@ -36,6 +40,7 @@ class MainBot :
         self.accountid: str = ""                                            
         
         self.api = IBGateway()
+        self.db = MongodbDatabase()
         self.strategy = []
 
         self.run_strategy : bool = False
@@ -58,6 +63,10 @@ class MainBot :
 
         self.api.connect_and_run(self.host,self.port,self.clientid,self.accountid)
         self.run_strategy = True
+
+        self.db.main_bot = self
+        self.db.connect()
+        self.db.api = self.api
 
         for strategy in self.strategy:
             strategy.start()
@@ -82,6 +91,8 @@ class MainBot :
 
         save_to_json (self.api.portfolio, "PnL.json")
         save_to_json (self.api.account_summary, "account.json")
+        self.db.save_account_info()
+        self.db.save_portfolio()
 
         if self.api.client.isConnected():
             self.api.disconnect()
@@ -130,10 +141,10 @@ class MainBot :
 
 def main():
 
-    while time_until_exchange_start("NASDAQ") > datetime.timedelta(minutes = 15):
+    # while time_until_exchange_start("NASDAQ") > datetime.timedelta(minutes = 15):
         
-        print(f"exchange active in {':'.join(str(time_until_exchange_start('NASDAQ')).split('.')[:1])}")
-        time.sleep (60)
+    #     print(f"exchange active in {':'.join(str(time_until_exchange_start('NASDAQ')).split('.')[:1])}")
+    #     time.sleep (60)
 
     app = MainBot ()
     app.add_strategy(SpreadStrategy())
