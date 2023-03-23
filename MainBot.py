@@ -61,12 +61,14 @@ class MainBot :
 
         self.load_param()
 
+        self.api.main_bot = self
         self.api.connect_and_run(self.host,self.port,self.clientid,self.accountid)
-        self.run_strategy = True
 
         self.db.main_bot = self
         self.db.connect()
         self.db.api = self.api
+
+        self.run_strategy = True
 
         for strategy in self.strategy:
             strategy.start()
@@ -91,8 +93,8 @@ class MainBot :
 
         save_to_json (self.api.portfolio, "PnL.json")
         save_to_json (self.api.account_summary, "account.json")
-        self.db.save_account_info()
-        self.db.save_portfolio()
+        self.db.save_account_info(self.api.account_summary)
+        self.db.save_portfolio(self.api.portfolio)
 
         if self.api.client.isConnected():
             self.api.disconnect()

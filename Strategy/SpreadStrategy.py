@@ -41,13 +41,25 @@ class SpreadStrategy :
         for key, value in data.items():
                 setattr(self, key, value)
        
-    def buy_spread (self):                                                    
+    def buy_spread (self, market = False):
+        if market:
+            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
+            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_first} at market.")
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_second} at market.")
+        
         self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
         self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_first} at {self.api.ticks[self.symbol_first]['ask']}")
         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_second} at {self.api.ticks[self.symbol_second]['bid']}")
 
-    def sell_spread (self):                                                   
+    def sell_spread (self, market = False):
+        if market:
+            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
+            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_first} at market.")
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_second} at market.")
+
         self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
         self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_first} at {self.api.ticks[self.symbol_first]['bid']}")
@@ -175,11 +187,11 @@ class SpreadStrategy :
 
                     if long_zScore < -self.entry_Zscore:               
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy spread at z-score: {long_zScore}")
-                        self.buy_spread()
+                        self.buy_spread(market = True)
                         
                     elif short_zScore > self.entry_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell spread at z-score: {short_zScore}")
-                        self.sell_spread()
+                        self.sell_spread(market = True)
                         
                     else:
                         self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.entry_Zscore}),{short_zScore},({self.entry_Zscore}),nothing happens")
@@ -189,14 +201,20 @@ class SpreadStrategy :
                 
                     if short_zScore > self.exit_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell spread at z-score: {short_zScore}")
-                        self.sell_spread()
+                        self.sell_spread(market = True)
+
+                    else:
+                        self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{short_zScore},({self.exit_Zscore}),nothing happens")
 
                 #when in short position        
                 elif self.current_position == -1:                              
                 
                     if long_zScore < -self.exit_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy spread at z-score: {long_zScore}")
-                        self.buy_spread()
+                        self.buy_spread(market = True)
+
+                    else:
+                        self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.exit_Zscore}),nothing happens")
 
             if not self._run:
                     break

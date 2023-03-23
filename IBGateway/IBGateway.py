@@ -33,6 +33,8 @@ class IBGateway(EWrapper):
 
         self.client: EClient = EClient(self)
 
+        self.main_bot = None
+
         self.host: str = ""
         self.port: int = None
         self.clientid: int = 0
@@ -296,6 +298,8 @@ class IBGateway(EWrapper):
                                             "unrealized_PnL": floatMaxString(unrealizedPNL),
                                             "realized_PnL": floatMaxString(realizedPNL),                          
                                             }
+        
+        self.main_bot.db.save_portfolio(self.portfolio)
         
     ########Receving########
 
