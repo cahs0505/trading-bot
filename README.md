@@ -1,2 +1,2 @@
 # trading-bot
-#Trading bot using a naive pair trading strategy
+Trading bot using a naive pair trading strategy
