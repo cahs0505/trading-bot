@@ -31,7 +31,7 @@ Create the following config files as per your use case and research
     "entry_Zscore" : 1,
     "exit_Zscore" : 0
 }     
-
+```
 Simply run
 ```
 python run.py
