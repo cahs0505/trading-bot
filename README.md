@@ -1,10 +1,10 @@
 # trading-bot
 Python-based trading bot using a naive pair trading strategy as an example (only for learning pupose)
 
-# usage
-Create the following config files as per your 
+# Usage
+Create the following config files as per your use case and research
 
-/config/account_example.json
+1. /config/account_example.json
 ```
 {
     "host": "127.0.0.1",                                         
@@ -16,7 +16,7 @@ Create the following config files as per your
 }       
 ```
 
-/config/spread_example.json
+2. /config/spread_example.json
 ```
 {
     "name": "spread1",
@@ -31,9 +31,8 @@ Create the following config files as per your
     "entry_Zscore" : 1,
     "exit_Zscore" : 0
 }     
-```
 
-
+Simply run
 ```
 python run.py
 ```
