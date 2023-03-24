@@ -143,11 +143,6 @@ class MainBot :
 
 def main():
 
-    # while time_until_exchange_start("NASDAQ") > datetime.timedelta(minutes = 15):
-        
-    #     print(f"exchange active in {':'.join(str(time_until_exchange_start('NASDAQ')).split('.')[:1])}")
-    #     time.sleep (60)
-
     app = MainBot ()
     app.add_strategy(SpreadStrategy())
     app.start()
