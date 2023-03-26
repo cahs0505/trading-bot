@@ -53,10 +53,12 @@ class MongodbDatabase :
 
         data = { 
                 "date": datetime.datetime.utcnow(),
+                "portfolio": []
         }
 
         for symbol,detail in portfolio.items():
-            data[symbol] = {
+            data["portfolio"].append({
+                    "symbol": symbol,
                     "sec_type": detail["sec_type"],
                     "exchange": detail["exchange"],
                     "position": Decimal128(detail["position"]),
@@ -65,20 +67,45 @@ class MongodbDatabase :
                     "average_cost": Decimal128(detail["average_cost"]),
                     "unrealized_PnL": Decimal128(detail["unrealized_PnL"]),
                     "realized_PnL": Decimal128(detail["realized_PnL"])
-                }
+            })
 
-        self.db.portfolio.insert_one(data)
+        self.db.portfolios.insert_one(data)
 
     def get_portfolio(self):
-        return self.db.portfolio.find().limit(1).sort([('$natural',-1)])[0]
+        return self.db.portfolios.find().limit(1).sort([('$natural',-1)])[0]
     
-    def get_all_portfolio(self):
-        data = []
-        for acc in self.db.portfolio.find():
-            data.append(acc)
+    def save_order(self,orderid,order):
 
-        return data
-        
+        data = { 
+                "date": datetime.datetime.utcnow(),
+                "_id": orderid,
+                "symbol": order["symbol"],
+                "sec_type": order["sec_type"],
+                "action": order["action"],
+                "order_type": order["order_type"],
+                "quantity": Decimal128(order["quantity"]),
+                "limit_price": Decimal128(order["limit_price"]),
+                "status": order["status"],
+        }
+
+        self.db.orders.insert_one(data)
+
+    def update_order(self,orderid,order):
+
+        data = {
+            "symbol": order["symbol"],
+            "sec_type": order["sec_type"],
+            "action": order["action"],
+            "order_type": order["order_type"],
+            "quantity": order["quantity"],
+            "limit_price": order["limit_price"],
+            "status": order["status"],
+            "filled": order["filled"],
+            "remaining": order["remaining"],
+            "avg_fill_price": order["avg_fill_price"]
+        }
+
+        self.db.orders.update_one({"_id": orderid}, data, upsert=True)
 
 def main():
     mongodb = MongodbDatabase()

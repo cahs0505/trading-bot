@@ -220,6 +220,8 @@ class IBGateway(EWrapper):
                                 "limit_price": order.lmtPrice,
                                 "status": orderState.status,
                                 }
+        
+        self.main_bot.db.save_order(orderid, self.orders[orderid])
 
         print(self.orders)
 
@@ -255,9 +257,12 @@ class IBGateway(EWrapper):
 
         self.orders[orderid].update({
                                     "filled": filled,
-                                    "remaining": remaining
+                                    "remaining": remaining,
+                                    "avg_fill_price": avgFillPrice
                                     })
         
+        self.main_bot.db.update_order(orderid, self.orders[orderid])
+
         if self.orders[orderid]['status'] == "Filled":
            self.orders.pop(orderid)
 

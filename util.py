@@ -48,11 +48,11 @@ def time_until_exchange_start(exchange):
         return datetime.datetime.combine(datetime.datetime.now(),TRADING_HOURS["NASDAQ"][0]) - now.replace(tzinfo=None)
         
     if day in range (4) or day == 6:
-        day_diff = 1
+        day_diff = 0
     elif day == 4:
-        day_diff = 3
-    elif day == 5:
         day_diff = 2
+    elif day == 5:
+        day_diff = 1
 
     day = datetime.date.today() + datetime.timedelta(days=day_diff)
     next_start = datetime.datetime.combine(day,TRADING_HOURS[exchange][0]) 
