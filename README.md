@@ -1,7 +1,14 @@
 # trading-bot
 Python-based trading bot using a naive pair trading strategy as an example (only for learning pupose)
 
+# Requirement
+
+1. Python 3.9.12
+2. Interative Broker Trader Work Station (TWS) <br/>
+https://interactivebrokers.github.io/tws-api/index.html
+
 # Usage
+
 Create the following config files as per your use case and research
 
 1. /config/account_example.json
