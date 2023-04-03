@@ -6,7 +6,7 @@ Python-based trading bot using a naive pair trading strategy as an example (only
 1. Python 3.9.12
 2. Interative Broker Trader Work Station (TWS) <br/>
 https://interactivebrokers.github.io/tws-api/index.html
-3. Mongodb 6.0.5
+3. Mongodb 6.0.5 (Optional)
 
 # Usage
 
