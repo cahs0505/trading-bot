@@ -1,5 +1,5 @@
 # trading-bot
-Python-based trading bot using the Interative Broker Trader Work Station (TWS) API,  
+Python-based multi-threaded trading bot using the Interative Broker Trader Work Station (TWS) API,  
 This repo uses an simple statistical arbitrage strategy as an example.
 
 # Requirement
