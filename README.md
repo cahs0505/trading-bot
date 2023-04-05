@@ -1,7 +1,16 @@
 # trading-bot
-Python-based trading bot using a naive pair trading strategy as an example (only for learning pupose)
+Python-based multi-threaded trading bot using the Interative Broker Trader Work Station (TWS) API,  
+This repo uses an simple statistical arbitrage strategy as an example.
+
+# Requirement
+
+1. Python 3.9.12
+2. Interative Broker Trader Work Station (TWS) <br/>
+https://interactivebrokers.github.io/tws-api/index.html
+3. Mongodb 6.0.5 (Optional)
 
 # Usage
+
 Create the following config files as per your use case and research
 
 1. /config/account_example.json
@@ -32,6 +41,7 @@ Create the following config files as per your use case and research
     "exit_Zscore" : 0
 }     
 ```
+Run the Interactive Broker TWS
 Simply run
 ```
 python run.py
