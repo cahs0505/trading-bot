@@ -6,7 +6,7 @@ SETTINGS: Dict[str, Any] = {
     "base_dir": "",
     
     "database.name": "mongodb",
-    "database.database": "mytest",
+    "database.database": "testing",
     "database.host": "0.0.0.0",
     "database.port": 27017,
     "database.user": "",

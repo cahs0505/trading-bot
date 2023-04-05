@@ -35,13 +35,13 @@ class MainBot :
     def __init__(self):
         
         self.host: str = ""                                        #localhost
-        self.port: int = None                                                #live:7496, paper:7497
-        self.clientid: int = 0                                                  #0: default
+        self.port: int = None                                      #live:7496, paper:7497
+        self.clientid: int = 0                                     #0: default
         self.accountid: str = ""                                            
         
         self.api = IBGateway()
         self.db = MongodbDatabase()
-        self.strategy = []
+        self.strategy = []                                         #deployed strategy            
 
         self.run_strategy : bool = False
 
@@ -60,16 +60,27 @@ class MainBot :
         self.logger.warning("Starting app...")
 
         self.load_param()
-
+        
+        #onnect to api
         self.api.main_bot = self
         self.api.connect_and_run(self.host,self.port,self.clientid,self.accountid)
 
+        #connect and init database
+        utc_now = datetime.datetime.combine(datetime.datetime.utcnow(),datetime.time(0, 0, 0))     
         self.db.main_bot = self
         self.db.connect()
         self.db.api = self.api
+        self.db.db.portfolios.update_one({"date": utc_now},{'$set':{"date": utc_now, "algo" : []}},upsert=True)
+        self.db.db.accounts.update_one({"date": utc_now},{'$set':{"date": utc_now, "algo" : []}},upsert=True)
 
+        #request basic info from api
+        self.api.request_account_info()
+        self.api.request_account_updates()
+        self.api.request_position()
+        self.api.request_open_orders()
+
+        #starting trading strategy
         self.run_strategy = True
-
         for strategy in self.strategy:
             strategy.start()
 
@@ -94,13 +105,13 @@ class MainBot :
         save_to_json (self.api.portfolio, "PnL.json")
         save_to_json (self.api.account_summary, "account.json")
         self.db.save_account_info(self.api.account_summary)
-        self.db.save_portfolio(self.api.portfolio)
+
 
         if self.api.client.isConnected():
             self.api.disconnect()
 
     def add_strategy(self, strategy):
-        strategy._main_bot = self
+        strategy.main_bot = self
         strategy.api = self.api
         self.strategy.append(strategy)
 
@@ -144,7 +155,7 @@ class MainBot :
 def main():
 
     app = MainBot ()
-    app.add_strategy(SpreadStrategy())
+    app.add_strategy(SpreadStrategy("spread1"))
     app.start()
 
 if __name__ == "__main__":

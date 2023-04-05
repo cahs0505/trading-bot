@@ -5,7 +5,7 @@ import time
 def main():
 
     app = MainBot ()
-    app.add_strategy(SpreadStrategy())
+    app.add_strategy(SpreadStrategy("spread1"))
     app.start()
 
 

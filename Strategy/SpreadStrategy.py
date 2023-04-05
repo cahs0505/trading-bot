@@ -1,4 +1,6 @@
 from threading import Thread
+from decimal import *
+from bson.decimal128 import Decimal128
 import logging
 import datetime
 import time
@@ -8,14 +10,14 @@ from util import exchange_time, setup_logger, check_exchange_active, time_until_
 
 class SpreadStrategy :
 
-    def __init__(self):
+    def __init__(self,name):
 
         self.main_bot = None
         self.api = None
 
         self._run = True
         
-        self.name: str = ""
+        self.name: str = name
         self.exchange: str = ""
         self.sec_type: str = ""
         self.symbol_first: str = ""
@@ -35,11 +37,14 @@ class SpreadStrategy :
 
        
     def load_param (self):
-        f = open("config/strategy/strategy_param_1.json")
+        f = open(f"config/strategy/{self.name}.json")
         data = json.load(f)
 
         for key, value in data.items():
                 setattr(self, key, value)
+        
+        self.spread_mean = Decimal(self.spread_mean)
+        self.spread_std = Decimal(self.spread_std)
        
     def buy_spread (self, market = False):
         if market:
@@ -133,10 +138,6 @@ class SpreadStrategy :
         time.sleep(3)  
     
         self.exchange_active = check_exchange_active(self.exchange)
-        self.api.request_account_info()
-        self.api.request_account_updates()
-        self.api.request_position()
-        self.api.request_open_orders()
         
         self.api.request_market_data_type(self.data_type)
         self.api.request_market_data(self.sec_type,self.symbol_first)
@@ -175,7 +176,8 @@ class SpreadStrategy :
                 if self.unfilled_order:                                 
                     self.logger.info(f"ALGO unfilled order, not entering position")
                     continue
-
+                
+                #compute zScore 
                 long_spread = self.api.ticks[self.symbol_first]["ask"] - self.api.ticks[self.symbol_second]["bid"]
                 long_zScore = round((long_spread-self.spread_mean) / self.spread_std,2)
 
@@ -215,6 +217,58 @@ class SpreadStrategy :
 
                     else:
                         self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.exit_Zscore}),nothing happens")
+
+                #update data to database
+                now_UTC = datetime.datetime.combine(datetime.datetime.utcnow(),datetime.time(0, 0, 0))
+
+                data = {
+                    "name": "spread1",
+                    self.symbol_first:Decimal128(self.api.ticks[self.symbol_first]["bid"]),
+                    self.symbol_second:Decimal128(self.api.ticks[self.symbol_second]["ask"]),
+                    "symbol":self.symbol_first+","+self.symbol_second,
+                    "long_spread": Decimal128(long_spread),
+                    "long_zScore" : Decimal128(long_zScore),
+                    "short_spread": Decimal128(short_spread),
+                    "short_zScore" : Decimal128(long_zScore),
+                    "position": self.current_position,
+                    "unrealized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["unrealized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["unrealized_PnL"])),
+                    "realized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["realized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["realized_PnL"])),
+                    "cum_ret":""
+                }
+
+                result = self.main_bot.db.db.portfolios.update_one(
+                        {
+                            "date" : now_UTC,
+                            "algo.name": "spread1"
+                        },
+                        {
+                            "$set":{ f"algo.$.{self.symbol_first}": data[self.symbol_first],
+                                     f"algo.$.{self.symbol_second}": data[self.symbol_first],
+
+                                     "algo.$.long_spread": data["long_spread"],
+                                     "algo.$.long_zScore": data["long_zScore"],
+                                     "algo.$.short_spread": data["short_spread"],
+                                     "algo.$.short_zScore": data["short_zScore"],
+                                     "algo.$.position": data["position"],
+                                     "algo.$.unrealized_PnL": data["unrealized_PnL"],
+                                     "algo.$.realized_PnL": data["realized_PnL"],
+                                    }
+
+                        }
+                        )
+                
+                if not result.matched_count:
+                    self.main_bot.db.db.portfolios.update_one(
+                    {
+                        "date": now_UTC
+                    },
+                    {
+                        "$addToSet": {
+                                
+                            "algo": data
+                        }
+                    }
+                 )
 
             if not self._run:
                     break

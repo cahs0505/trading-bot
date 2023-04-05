@@ -3,6 +3,7 @@ import argparse
 import logging
 from threading import Thread
 from typing import Dict
+from decimal import *
 
 import ibapi
 from ibapi.wrapper import EWrapper
@@ -141,19 +142,19 @@ class IBGateway(EWrapper):
           
           if price != 0:
             symbol = self.requests["market_data"][req]["symbol"]
-            self.ticks[symbol]["bid"] = price
+            self.ticks[symbol]["bid"] = Decimal(str(price))
            
         if tickType == 2 or tickType == 67:
           
           if price != 0:
             symbol = self.requests["market_data"][req]["symbol"]
-            self.ticks[symbol]["ask"] = price
+            self.ticks[symbol]["ask"] = Decimal(str(price))
 
         if tickType == 4 or tickType == 68:
           
           if price != 0:
             symbol = self.requests["market_data"][req]["symbol"]
-            self.ticks[symbol]["last_price"] = price
+            self.ticks[symbol]["last_price"] = Decimal(str(price))
         
     def contractDetails(self, reqId, contractDetails):
         print(f"contract details: {contractDetails}")
@@ -221,7 +222,7 @@ class IBGateway(EWrapper):
                                 "status": orderState.status,
                                 }
         
-        self.main_bot.db.save_order(orderid, self.orders[orderid])
+        # self.main_bot.db.save_order(orderid, self.orders[orderid])
 
         print(self.orders)
 
@@ -261,7 +262,7 @@ class IBGateway(EWrapper):
                                     "avg_fill_price": avgFillPrice
                                     })
         
-        self.main_bot.db.update_order(orderid, self.orders[orderid])
+        # self.main_bot.db.update_order(orderid, self.orders[orderid])
 
         if self.orders[orderid]['status'] == "Filled":
            self.orders.pop(orderid)
@@ -304,7 +305,7 @@ class IBGateway(EWrapper):
                                             "realized_PnL": floatMaxString(realizedPNL),                          
                                             }
         
-        self.main_bot.db.save_portfolio(self.portfolio)
+        # self.main_bot.db.save_portfolio(self.portfolio)
         
     ########Receving########
 
