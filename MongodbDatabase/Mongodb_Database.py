@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+import os
 import time
 import datetime
 from bson.decimal128 import Decimal128
@@ -22,22 +23,26 @@ class MongodbDatabase :
     def connect (self):
         self.client  = MongoClient(f"{SETTINGS['database.name']}://{SETTINGS['database.host']}:{SETTINGS['database.port']}/")
         self.db = self.client[self.database_name]
+        # self.remote_client = MongoClient(os.environ.get("MONGODB"))
 
     def save_account_info(self,account):
-        data = {
-            "date": datetime.datetime.utcnow(),
-            "available_funds": Decimal128(account['AvailableFunds'][0]),
-            "buying_power": Decimal128(account['BuyingPower'][0]),
-            "equity_with_loan_value": Decimal128(account['EquityWithLoanValue'][0]),
-            "excess_liquidity": Decimal128(account['ExcessLiquidity'][0]),
-            "full_init_margin_req": Decimal128(account['FullInitMarginReq'][0]),
-            "full_maint_margin_req": Decimal128(account['FullMaintMarginReq'][0]),
-            "gross_position_value": Decimal128(account['GrossPositionValue'][0]),
-            "net_liquidation": Decimal128(account['NetLiquidation'][0]),
-            "total_cash_value": Decimal128(account['TotalCashValue'][0]),
-        }
+        now_UTC = datetime.datetime.combine(datetime.datetime.utcnow(),datetime.time(0, 0, 0))
+        try:
+            data = {
+                "available_funds": Decimal128(account['AvailableFunds'][0]),
+                "buying_power": Decimal128(account['BuyingPower'][0]),
+                "equity_with_loan_value": Decimal128(account['EquityWithLoanValue'][0]),
+                "excess_liquidity": Decimal128(account['ExcessLiquidity'][0]),
+                "full_init_margin_req": Decimal128(account['FullInitMarginReq'][0]),
+                "full_maint_margin_req": Decimal128(account['FullMaintMarginReq'][0]),
+                "gross_position_value": Decimal128(account['GrossPositionValue'][0]),
+                "net_liquidation": Decimal128(account['NetLiquidation'][0]),
+                "total_cash_value": Decimal128(account['TotalCashValue'][0]),
+            }
 
-        self.db.accounts.insert_one(data)
+            self.db.accounts.update_one({"date" : now_UTC},{"$set":data})
+        except Exception as e:
+            print(e)
 
     def get_lastest_account_info(self):
         return self.db.accounts.find().limit(1).sort([('$natural',-1)])[0]
@@ -55,58 +60,66 @@ class MongodbDatabase :
                 "date": datetime.datetime.utcnow(),
                 "portfolio": []
         }
+        try:
+            for symbol,detail in portfolio.items():
+                data["portfolio"].append({
+                        "symbol": symbol,
+                        "sec_type": detail["sec_type"],
+                        "exchange": detail["exchange"],
+                        "position": Decimal128(detail["position"]),
+                        "market_price": Decimal128(detail["market_price"]),
+                        "market_value": Decimal128(detail["market_value"]),
+                        "average_cost": Decimal128(detail["average_cost"]),
+                        "unrealized_PnL": Decimal128(detail["unrealized_PnL"]),
+                        "realized_PnL": Decimal128(detail["realized_PnL"])
+                })
 
-        for symbol,detail in portfolio.items():
-            data["portfolio"].append({
-                    "symbol": symbol,
-                    "sec_type": detail["sec_type"],
-                    "exchange": detail["exchange"],
-                    "position": Decimal128(detail["position"]),
-                    "market_price": Decimal128(detail["market_price"]),
-                    "market_value": Decimal128(detail["market_value"]),
-                    "average_cost": Decimal128(detail["average_cost"]),
-                    "unrealized_PnL": Decimal128(detail["unrealized_PnL"]),
-                    "realized_PnL": Decimal128(detail["realized_PnL"])
-            })
-
-        self.db.portfolios.insert_one(data)
+            self.db.portfolios.insert_one(data)
+        except Exception as e:
+            print(e)
 
     def get_portfolio(self):
         return self.db.portfolios.find().limit(1).sort([('$natural',-1)])[0]
     
     def save_order(self,orderid,order):
 
-        data = { 
-                "date": datetime.datetime.utcnow(),
-                "_id": orderid,
+        try:
+            data = { 
+                    "date": datetime.datetime.utcnow(),
+                    "_id": orderid,
+                    "symbol": order["symbol"],
+                    "sec_type": order["sec_type"],
+                    "action": order["action"],
+                    "order_type": order["order_type"],
+                    "quantity": Decimal128(order["quantity"]),
+                    "limit_price": Decimal128(order["limit_price"]),
+                    "status": order["status"],
+            }
+        
+            self.db.orders.insert_one(data)
+
+        except Exception as e:
+            print(e)
+
+    def update_order(self,orderid,order):
+
+        try:
+            data = {
                 "symbol": order["symbol"],
                 "sec_type": order["sec_type"],
                 "action": order["action"],
                 "order_type": order["order_type"],
-                "quantity": Decimal128(order["quantity"]),
-                "limit_price": Decimal128(order["limit_price"]),
+                "quantity": order["quantity"],
+                "limit_price": order["limit_price"],
                 "status": order["status"],
-        }
+                "filled": order["filled"],
+                "remaining": order["remaining"],
+                "avg_fill_price": order["avg_fill_price"]
+            }
 
-        self.db.orders.insert_one(data)
-
-    def update_order(self,orderid,order):
-
-        data = {
-            "symbol": order["symbol"],
-            "sec_type": order["sec_type"],
-            "action": order["action"],
-            "order_type": order["order_type"],
-            "quantity": order["quantity"],
-            "limit_price": order["limit_price"],
-            "status": order["status"],
-            "filled": order["filled"],
-            "remaining": order["remaining"],
-            "avg_fill_price": order["avg_fill_price"]
-        }
-
-        self.db.orders.update_one({"_id": orderid}, data, upsert=True)
-
+            self.db.orders.update_one({"_id": orderid}, data, upsert=True)
+        except Exception as e:
+            print(e)
 def main():
     mongodb = MongodbDatabase()
     mongodb.connect()

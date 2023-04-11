@@ -6,6 +6,7 @@ def main():
 
     app = MainBot ()
     app.add_strategy(SpreadStrategy("spread1"))
+    app.add_strategy(SpreadStrategy("spread2"))
     app.start()
 
 

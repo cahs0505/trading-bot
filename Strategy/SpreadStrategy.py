@@ -23,6 +23,8 @@ class SpreadStrategy :
         self.symbol_first: str = ""
         self.symbol_second: str = ""
         self.pair: list = []
+        self.unit_quantity: None
+        self.unit_quantity: list = []
         self.hedge_ratio = None                                                                
         self.spread_mean = None                          
         self.spread_std = None 
@@ -43,32 +45,33 @@ class SpreadStrategy :
         for key, value in data.items():
                 setattr(self, key, value)
         
+        self.hedge_ratio = Decimal(self.hedge_ratio)
         self.spread_mean = Decimal(self.spread_mean)
         self.spread_std = Decimal(self.spread_std)
        
-    def buy_spread (self, market = False):
+    def buy_spread (self, quantity, market = False):
         if market:
-            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
-            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
+            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_first, quantity * self.unit_quantity[0],self.api.ticks[self.symbol_first]["ask"])
+            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_second, quantity * self.unit_quantity[1],self.api.ticks[self.symbol_second]["bid"])
             self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_first} at market.")
             self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_second} at market.")
-        
-        self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_first,1,self.api.ticks[self.symbol_first]["ask"])
-        self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_second,1,self.api.ticks[self.symbol_second]["bid"])
-        self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_first} at {self.api.ticks[self.symbol_first]['ask']}")
-        self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_second} at {self.api.ticks[self.symbol_second]['bid']}")
+        else:
+            self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_first, quantity * self.unit_quantity[0],self.api.ticks[self.symbol_first]["ask"])
+            self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_second, quantity * self.unit_quantity[1],self.api.ticks[self.symbol_second]["bid"])
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_first} at {self.api.ticks[self.symbol_first]['ask']}")
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_second} at {self.api.ticks[self.symbol_second]['bid']}")
 
-    def sell_spread (self, market = False):
+    def sell_spread (self, quantity, market = False):
         if market:
-            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
-            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
+            self.api.order(self.sec_type,"MARKET","SELL",self.symbol_first, quantity * self.unit_quantity[0],self.api.ticks[self.symbol_first]["bid"])
+            self.api.order(self.sec_type,"MARKET","BUY",self.symbol_second, quantity * self.unit_quantity[1],self.api.ticks[self.symbol_second]["ask"])
             self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_first} at market.")
             self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_second} at market.")
-
-        self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_first,1,self.api.ticks[self.symbol_first]["bid"])
-        self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_second,1,self.api.ticks[self.symbol_second]["ask"])
-        self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_first} at {self.api.ticks[self.symbol_first]['bid']}")
-        self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_second} at {self.api.ticks[self.symbol_second]['ask']}")
+        else:
+            self.api.order(self.sec_type,"LIMIT","SELL",self.symbol_first, quantity *self.unit_quantity[0],self.api.ticks[self.symbol_first]["bid"])
+            self.api.order(self.sec_type,"LIMIT","BUY",self.symbol_second, quantity *self.unit_quantity[1],self.api.ticks[self.symbol_second]["ask"])
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell {self.symbol_first} at {self.api.ticks[self.symbol_first]['bid']}")
+            self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy {self.symbol_second} at {self.api.ticks[self.symbol_second]['ask']}")
 
     # 1:long / 0:neutral/ -1:short
     def check_position (self):
@@ -108,12 +111,21 @@ class SpreadStrategy :
     #check if ticks function normally
     def check_ticks (self):
         
-        if( not self.api.ticks[self.symbol_first] or
-            not self.api.ticks[self.symbol_second] or
-            self.api.ticks[self.symbol_first]["bid"] == 0 or
-            self.api.ticks[self.symbol_first]["ask"] == 0 or
-            self.api.ticks[self.symbol_second]["bid"] == 0 or
-            self.api.ticks[self.symbol_second]["ask"] == 0):
+        if( self.symbol_first not in self.api.ticks or
+            self.symbol_second not in self.api.ticks or
+            "bid" not in self.api.ticks[self.symbol_first] or
+            "ask" not in self.api.ticks[self.symbol_first] or 
+            "bid" not in self.api.ticks[self.symbol_second] or
+            "ask" not in self.api.ticks[self.symbol_second] or 
+            self.api.ticks[self.symbol_first]["bid"] == Decimal(0.0) or
+            self.api.ticks[self.symbol_first]["ask"] == Decimal(0.0) or
+            self.api.ticks[self.symbol_second]["bid"] == Decimal(0.0) or
+            self.api.ticks[self.symbol_second]["ask"] == Decimal(0.0) or
+            self.api.ticks[self.symbol_first]["bid"] == Decimal(-1.0) or
+            self.api.ticks[self.symbol_first]["ask"] == Decimal(-1.0) or
+            self.api.ticks[self.symbol_second]["bid"] == Decimal(-1.0) or
+            self.api.ticks[self.symbol_second]["ask"] == Decimal(-1.0)            
+            ):
             
             return False
         
@@ -144,7 +156,7 @@ class SpreadStrategy :
         self.api.request_market_data(self.sec_type,self.symbol_second)
         
         while self._run:
-            time.sleep(5)
+            time.sleep(15)
             while self.api.client.isConnected():
 
                 if not self._run:
@@ -178,10 +190,10 @@ class SpreadStrategy :
                     continue
                 
                 #compute zScore 
-                long_spread = self.api.ticks[self.symbol_first]["ask"] - self.api.ticks[self.symbol_second]["bid"]
+                long_spread = self.api.ticks[self.symbol_first]["ask"] - self.hedge_ratio * self.api.ticks[self.symbol_second]["bid"]
                 long_zScore = round((long_spread-self.spread_mean) / self.spread_std,2)
 
-                short_spread = self.api.ticks[self.symbol_first]["bid"] - self.api.ticks[self.symbol_second]["ask"]
+                short_spread = self.api.ticks[self.symbol_first]["bid"] - self.hedge_ratio * self.api.ticks[self.symbol_second]["ask"]
                 short_zScore = round((short_spread-self.spread_mean) / self.spread_std,2)
 
                 #when in neutral position
@@ -189,11 +201,11 @@ class SpreadStrategy :
 
                     if long_zScore < -self.entry_Zscore:               
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy spread at z-score: {long_zScore}")
-                        self.buy_spread(market = True)
+                        self.buy_spread(quantity = self.quantity, market = True)
                         
                     elif short_zScore > self.entry_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell spread at z-score: {short_zScore}")
-                        self.sell_spread(market = True)
+                        self.sell_spread(quantity = self.quantity, market = True)
                         
                     else:
                         self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.entry_Zscore}),{short_zScore},({self.entry_Zscore}),nothing happens")
@@ -203,7 +215,7 @@ class SpreadStrategy :
                 
                     if short_zScore > self.exit_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Sell spread at z-score: {short_zScore}")
-                        self.sell_spread(market = True)
+                        self.sell_spread(quantity = self.quantity, market = True)
 
                     else:
                         self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{short_zScore},({self.exit_Zscore}),nothing happens")
@@ -213,62 +225,64 @@ class SpreadStrategy :
                 
                     if long_zScore < -self.exit_Zscore:
                         self.logger.critical(f"ALGO {exchange_time(self.exchange)}: Buy spread at z-score: {long_zScore}")
-                        self.buy_spread(market = True)
+                        self.buy_spread(quantity = self.quantity, market = True)
 
                     else:
                         self.logger.info(f"ALGO {exchange_time(self.exchange)}: z-score:{long_zScore},({-self.exit_Zscore}),nothing happens")
 
                 #update data to database
-                now_UTC = datetime.datetime.combine(datetime.datetime.utcnow(),datetime.time(0, 0, 0))
+                try:
+                    now_UTC = datetime.datetime.combine(datetime.datetime.utcnow(),datetime.time(0, 0, 0))
 
-                data = {
-                    "name": "spread1",
-                    self.symbol_first:Decimal128(self.api.ticks[self.symbol_first]["bid"]),
-                    self.symbol_second:Decimal128(self.api.ticks[self.symbol_second]["ask"]),
-                    "symbol":self.symbol_first+","+self.symbol_second,
-                    "long_spread": Decimal128(long_spread),
-                    "long_zScore" : Decimal128(long_zScore),
-                    "short_spread": Decimal128(short_spread),
-                    "short_zScore" : Decimal128(long_zScore),
-                    "position": self.current_position,
-                    "unrealized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["unrealized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["unrealized_PnL"])),
-                    "realized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["realized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["realized_PnL"])),
-                    "cum_ret":""
-                }
+                    data = {
+                        "name": self.name,
+                        "first_tick":Decimal128(self.api.ticks[self.symbol_first]["bid"]),
+                        "second_tick":Decimal128(self.api.ticks[self.symbol_second]["ask"]),
+                        "symbol":self.symbol_first+","+self.symbol_second,
+                        "long_spread": Decimal128(long_spread),
+                        "long_zScore" : Decimal128(long_zScore),
+                        "short_spread": Decimal128(short_spread),
+                        "short_zScore" : Decimal128(short_zScore),
+                        "position": self.current_position,
+                        "unrealized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["unrealized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["unrealized_PnL"])),
+                        "realized_PnL":Decimal128(Decimal(self.api.portfolio[self.symbol_first]["realized_PnL"]) + Decimal(self.api.portfolio[self.symbol_second]["realized_PnL"])),
+                        "cum_ret":""
+                    }
 
-                result = self.main_bot.db.db.portfolios.update_one(
+                    result = self.main_bot.db.db.portfolios.update_one(
+                            {
+                                "date" : now_UTC,
+                                "algo.name": self.name
+                            },
+                            {
+                                "$set":{ "algo.$.first_tick": data["first_tick"],
+                                        "algo.$.second_tick": data["second_tick"],
+                                        "algo.$.long_spread": data["long_spread"],
+                                        "algo.$.long_zScore": data["long_zScore"],
+                                        "algo.$.short_spread": data["short_spread"],
+                                        "algo.$.short_zScore": data["short_zScore"],
+                                        "algo.$.position": data["position"],
+                                        "algo.$.unrealized_PnL": data["unrealized_PnL"],
+                                        "algo.$.realized_PnL": data["realized_PnL"],
+                                        }
+
+                            }
+                            )
+                    
+                    if not result.matched_count:
+                        self.main_bot.db.db.portfolios.update_one(
                         {
-                            "date" : now_UTC,
-                            "algo.name": "spread1"
+                            "date": now_UTC
                         },
                         {
-                            "$set":{ f"algo.$.{self.symbol_first}": data[self.symbol_first],
-                                     f"algo.$.{self.symbol_second}": data[self.symbol_first],
-
-                                     "algo.$.long_spread": data["long_spread"],
-                                     "algo.$.long_zScore": data["long_zScore"],
-                                     "algo.$.short_spread": data["short_spread"],
-                                     "algo.$.short_zScore": data["short_zScore"],
-                                     "algo.$.position": data["position"],
-                                     "algo.$.unrealized_PnL": data["unrealized_PnL"],
-                                     "algo.$.realized_PnL": data["realized_PnL"],
-                                    }
-
+                            "$addToSet": {
+                                    
+                                "algo": data
+                            }
                         }
-                        )
-                
-                if not result.matched_count:
-                    self.main_bot.db.db.portfolios.update_one(
-                    {
-                        "date": now_UTC
-                    },
-                    {
-                        "$addToSet": {
-                                
-                            "algo": data
-                        }
-                    }
-                 )
+                    )
+                except Exception as e:
+                    self.logger.error(e)
 
             if not self._run:
                     break

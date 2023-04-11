@@ -10,6 +10,7 @@ import signal
 import logging
 import time
 from bson.decimal128 import Decimal128
+from dotenv import load_dotenv
 
 from util import *
 
@@ -59,9 +60,11 @@ class MainBot :
         self.logger = logging.getLogger("main") 
         self.logger.warning("Starting app...")
 
+        #to be combined
         self.load_param()
+        load_dotenv()
         
-        #onnect to api
+        #connect to IBapi
         self.api.main_bot = self
         self.api.connect_and_run(self.host,self.port,self.clientid,self.accountid)
 
@@ -70,8 +73,8 @@ class MainBot :
         self.db.main_bot = self
         self.db.connect()
         self.db.api = self.api
-        self.db.db.portfolios.update_one({"date": utc_now},{'$set':{"date": utc_now, "algo" : []}},upsert=True)
-        self.db.db.accounts.update_one({"date": utc_now},{'$set':{"date": utc_now, "algo" : []}},upsert=True)
+        self.db.db.portfolios.update_one({"date": utc_now},{'$setOnInsert':{"date": utc_now, "algo" : []}},upsert=True)
+        self.db.db.accounts.update_one({"date": utc_now},{'$setOnInsert':{"date": utc_now}},upsert=True)
 
         #request basic info from api
         self.api.request_account_info()
@@ -102,10 +105,7 @@ class MainBot :
 
         self.active = False
 
-        save_to_json (self.api.portfolio, "PnL.json")
-        save_to_json (self.api.account_summary, "account.json")
         self.db.save_account_info(self.api.account_summary)
-
 
         if self.api.client.isConnected():
             self.api.disconnect()
@@ -128,11 +128,11 @@ class MainBot :
                 self.api.check_connection()
                 
             self.logger.info(f"ACCOUNT {exchange_time(self.exchange)}: {self.api.account_summary}")
-            self.logger.info(f"POSITIONS {exchange_time(self.exchange)}: {self.api.my_position}")
+            # self.logger.info(f"POSITIONS {exchange_time(self.exchange)}: {self.api.my_position}")
             self.logger.info(f"PORTFOLIO {exchange_time(self.exchange)}: {self.api.portfolio}")
-            self.logger.info(f"ORDER {exchange_time(self.exchange)}: {self.api.orders}")
+            # self.logger.info(f"ORDER {exchange_time(self.exchange)}: {self.api.orders}")
             self.logger.info(f"REQUESTS {exchange_time(self.exchange)}: {self.api.requests}")
-            
+            self.logger.info(f"TICKSS {exchange_time(self.exchange)}: {self.api.ticks}")
 
             #error handling, to be refactored and extended
             while self.api.errors :
@@ -146,7 +146,8 @@ class MainBot :
                         self.logger.error(f"ERROR {exchange_time(self.exchange)}: requesting again")
                         self.api.request_market_data(request["sec_type"],request["symbol"])
                         self.api.requests["market_data"].pop(error["request_id"])
-
+            
+            self.db.save_account_info(self.api.account_summary)
 
 
 

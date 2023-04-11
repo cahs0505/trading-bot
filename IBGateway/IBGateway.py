@@ -4,6 +4,7 @@ import logging
 from threading import Thread
 from typing import Dict
 from decimal import *
+import queue
 
 import ibapi
 from ibapi.wrapper import EWrapper
@@ -49,7 +50,8 @@ class IBGateway(EWrapper):
                                 "position": {},
                                 "open_orders": {},
                                 "account_updates" : {}
-                              } 
+                              }
+        self.pending_request = queue.Queue() 
         self.ticks: Dict = {}
         self.my_position: Dict = {}
         self.portfolio: Dict ={}
@@ -77,12 +79,16 @@ class IBGateway(EWrapper):
         self.thread = Thread(target=self.client.run)
         self.thread.start()
 
+        self.request_processor: Thread = Thread(target=self.process_request)
+        self.request_processor.start()
+
     def disconnect(self):
         # if not self.connection_status:
         #     return 
         
         # self.connection_status = False
         self.client.disconnect()
+        
       
     def check_connection(self):
         if self.client.isConnected():
@@ -312,60 +318,138 @@ class IBGateway(EWrapper):
     #######Request#########
 
     def request_market_data_type(self,type):
-       self.client.reqMarketDataType(MARKET_DATA_TYPE[type])
+
+        request = {
+            "type":"market_data_type",
+            "params":{
+                "type": type,
+            }
+        }
+
+        self.pending_request.put(request)
 
     def request_market_data(self,sec_type,symbol):
-        if not self.requests["market_data"]:
-            request_id = 1000
-        else:
-            request_id = max(k for k, v in self.requests["market_data"].items()) + 1
-        self.ticks[symbol] = dict()
-        if sec_type == "STK":
-            self.client.reqMktData(request_id, Contracts.USStockAtSmart(symbol), "", False, False, [])
-        elif sec_type == "CASH":
-            self.client.reqMktData(request_id, Contracts.Fx(symbol,"USD"), "", False, False, [])
-        
-        self.requests["market_data"][request_id] = {"symbol": symbol,
-                                                    "sec_type": sec_type,
-                                                    "error": None}
+
+        request = {
+            "type":"market_data",
+            "params":{
+                "sec_type": sec_type,
+                "symbol": symbol
+            }
+        }
+
+        self.pending_request.put(request)
 
     def request_account_info(self):
-        if not self.requests["account_info"]:
-            request_id = 2000
-        else:
-            request_id = max(self.requests["account_info"]) + 1
-          
-        self.client.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
-        self.requests["account_info"][request_id] = {"error": None}
+
+        request = {
+            "type":"account_info",
+            "params":{     
+            }
+        }
+
+        self.pending_request.put(request)
 
     def request_position(self):
-        if not self.requests["position"]:
-            request_id = 3000
-        else:
-            request_id = max(self.requests["position"]) + 1
-          
-        self.client.reqPositions()
-        self.requests["position"][request_id] = {"error": None}
 
+        request = {
+            "type":"position",
+            "params":{     
+            }
+        }
+
+        self.pending_request.put(request)
+       
     def request_open_orders(self):
-        if not self.requests["open_orders"]:
-            request_id = 4000
-        else:
-            request_id = max(self.requests["open_orders"]) + 1
+        
+        request = {
+            "type":"open_orders",
+            "params":{     
+            }
+        }
 
-        self.client.reqOpenOrders()
-        self.requests["open_orders"][request_id] = {"error": None}
+        self.pending_request.put(request)
 
     def request_account_updates(self):
-        if not self.requests["account_updates"]:
-            request_id = 5000
-        else:
-            request_id = max(self.requests["account_updates"]) + 1
-        
-        self.client.reqAccountUpdates(True, self.accountid)
-        self.requests["account_updates"][request_id] = {"error": None}
 
+        request = {
+            "type":"account_updates",
+            "params":{     
+            }
+        }
+
+        self.pending_request.put(request)
+        
     #######Request#########
+
+    def process_request(self):
+        while self.client.isConnected():
+
+            while not self.pending_request.empty():
+
+                request = self.pending_request.get()
+
+                if(request["type"] == "market_data_type"):
+
+                    self.client.reqMarketDataType(MARKET_DATA_TYPE[request["params"]["type"]])
+                
+                elif (request["type"] == "market_data"):
+
+                    if not self.requests["market_data"]:
+                        request_id = 1000
+                    else:
+                        request_id = max(k for k, v in self.requests["market_data"].items()) + 1
+
+                    self.ticks[request["params"]["symbol"]] = dict()
+
+                    if request["params"]["sec_type"] == "STK":
+                        self.client.reqMktData(request_id, Contracts.USStockAtSmart(request["params"]["symbol"]), "", False, False, [])
+                    elif request["params"]["sec_type"] == "CASH":
+                        self.client.reqMktData(request_id, Contracts.Fx(request["params"]["symbol"],"USD"), "", False, False, [])
+                    
+                    self.requests["market_data"][request_id] = {"symbol": request["params"]["symbol"],
+                                                                "sec_type": request["params"]["sec_type"],
+                                                                "error": None}
+                
+                elif (request["type"] == "account_info"):
+
+                    if not self.requests["account_info"]:
+                        request_id = 2000
+                    else:
+                        request_id = max(self.requests["account_info"]) + 1
+                    
+                    self.client.reqAccountSummary(request_id,"All", AccountSummaryTags.AllTags)
+                    self.requests["account_info"][request_id] = {"error": None}
+
+                elif (request["type"] == "position"):
+
+                    if not self.requests["position"]:
+                        request_id = 3000
+                    else:
+                        request_id = max(self.requests["position"]) + 1
+                    
+                    self.client.reqPositions()
+                    self.requests["position"][request_id] = {"error": None}
+                
+                elif (request["type"] == "open_orders"):
+
+                    if not self.requests["open_orders"]:
+                        request_id = 4000
+                    else:
+                        request_id = max(self.requests["open_orders"]) + 1
+
+                    self.client.reqOpenOrders()
+                    self.requests["open_orders"][request_id] = {"error": None}
+
+                elif (request["type"] == "account_updates"):
+
+                    if not self.requests["account_updates"]:
+                        request_id = 5000
+                    else:
+                        request_id = max(self.requests["account_updates"]) + 1
+                    
+                    self.client.reqAccountUpdates(True, self.accountid)
+                    self.requests["account_updates"][request_id] = {"error": None}
 
     #######CancelRequests#########
     def cancel_market_data(self, request_id):
